@@ -712,35 +712,55 @@ export default function HomePage() {
                           <article
                             key={item.id}
                             className={`group cursor-pointer transition-colors hover:bg-accent/30 ${
-                              item.is_read ? 'opacity-70' : ''
+                              item.is_read ? 'opacity-50' : ''
                             }`}
                             onClick={() => handleMarkAsRead(item)}
                           >
-                                                        <div className="px-6 py-5">
+                            <div className="px-6 py-5">
                               <div className="flex items-start gap-4">
                                 {/* Placeholder image */}
-                                <div className="w-16 h-16 bg-gradient-to-br from-primary/10 to-secondary/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                                <div className={`w-16 h-16 bg-gradient-to-br from-primary/10 to-secondary/10 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                                  item.is_read ? 'opacity-60' : ''
+                                }`}>
                                   <Rss className="h-6 w-6 text-primary/40" />
                                 </div>
                                 
                                 <div className="flex-1 min-w-0 flex justify-between">
                                   <div className="flex-1 min-w-0">
-                                    <h3 className={`text-base font-normal mb-1 leading-relaxed line-clamp-2 ${
-                                      item.is_read ? 'text-muted-foreground' : 'text-foreground hover:text-primary transition-colors'
-                                    }`}>
-                                      {item.title || 'Untitled'}
-                                    </h3>
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <h3 className={`text-base font-normal leading-relaxed line-clamp-2 ${
+                                        item.is_read ? 'text-muted-foreground/70' : 'text-foreground hover:text-primary transition-colors'
+                                      }`}>
+                                        {item.title || 'Untitled'}
+                                      </h3>
+                                      {item.url && (
+                                        <a
+                                          href={item.url}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className={`text-muted-foreground hover:text-primary transition-colors flex-shrink-0 ${
+                                            item.is_read ? 'opacity-60' : ''
+                                          }`}
+                                          onClick={(e) => e.stopPropagation()}
+                                          title="Open original article"
+                                        >
+                                          <ExternalLink className="h-4 w-4" />
+                                        </a>
+                                      )}
+                                    </div>
                                     
                                     {item.published_at && (
                                       <div className="mb-2 flex items-center gap-2">
                                         <span className={`text-xs font-medium ${
-                                          item.is_read ? 'text-muted-foreground/40' : 'text-muted-foreground/60'
+                                          item.is_read ? 'text-muted-foreground/50' : 'text-muted-foreground/60'
                                         }`}>
                                           {getFeedTitle(item.feed_id, feeds)}
                                         </span>
-                                        <span className="text-muted-foreground/40">•</span>
+                                        <span className={`${
+                                          item.is_read ? 'text-muted-foreground/40' : 'text-muted-foreground/40'
+                                        }`}>•</span>
                                         <span className={`text-xs font-medium ${
-                                          item.is_read ? 'text-muted-foreground/60' : 'text-muted-foreground'
+                                          item.is_read ? 'text-muted-foreground/50' : 'text-muted-foreground/60'
                                         }`}>
                                           {formatRelativeTime(item.published_at)}
                                         </span>
@@ -749,7 +769,7 @@ export default function HomePage() {
                                     
                                     {item.content_text && (
                                       <p className={`text-sm mb-3 line-clamp-2 leading-relaxed ${
-                                        item.is_read ? 'text-muted-foreground/80' : 'text-muted-foreground'
+                                        item.is_read ? 'text-muted-foreground/60' : 'text-muted-foreground'
                                       }`}>
                                         {item.content_text}
                                       </p>
@@ -757,7 +777,9 @@ export default function HomePage() {
                                     
                                     <div className="flex items-center gap-3 text-sm text-muted-foreground">
                                       {selectedCategory && selectedFeed && (
-                                        <span className="text-xs font-medium">
+                                        <span className={`text-xs font-medium ${
+                                          item.is_read ? 'text-muted-foreground/50' : 'text-muted-foreground/70'
+                                        }`}>
                                           {selectedFeed.title || 'Unknown Source'}
                                         </span>
                                       )}
@@ -765,22 +787,10 @@ export default function HomePage() {
                                   </div>
                                   
                                   <div className="flex items-start space-x-2 flex-shrink-0">
-                                    {item.url && (
-                                      <a
-                                        href={item.url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="text-muted-foreground hover:text-primary transition-colors p-1"
-                                        onClick={(e) => e.stopPropagation()}
-                                      >
-                                        <ExternalLink className="h-4 w-4" />
-                                      </a>
-                                    )}
-                                    {!item.is_read && (
-                                      <div className="w-2 h-2 bg-primary rounded-full mt-1" />
-                                    )}
                                     {item.starred && (
-                                      <Badge variant="secondary" className="text-xs">★</Badge>
+                                      <Badge variant="secondary" className={`text-xs ${
+                                        item.is_read ? 'opacity-60' : ''
+                                      }`}>★</Badge>
                                     )}
                                   </div>
                                 </div>
