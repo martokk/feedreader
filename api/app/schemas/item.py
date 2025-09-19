@@ -10,6 +10,7 @@ class ItemResponse(BaseModel):
     feed_id: uuid.UUID
     title: Optional[str]
     url: Optional[str]
+    content_text: Optional[str]
     published_at: Optional[datetime]
     fetched_at: datetime
     created_at: datetime

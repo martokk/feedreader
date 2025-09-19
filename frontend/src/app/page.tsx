@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronDown, ChevronRight, Filter, Folder, FolderPlus, Plus, RefreshCw, Rss, Search, Settings } from 'lucide-react';
+import { ChevronDown, ChevronRight, ExternalLink, Filter, Folder, FolderPlus, Plus, RefreshCw, Rss, Search, Settings } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -16,6 +16,56 @@ import { Category, Feed, Item } from '@/types';
 import { AddFeedDialog } from '@/components/dialogs/AddFeedDialog';
 import { CategoryDialog } from '@/components/dialogs/CategoryDialog';
 import { FeedSettingsDialog } from '@/components/dialogs/FeedSettingsDialog';
+
+// Helper function to get feed title by feed_id
+const getFeedTitle = (feedId: string, feeds: Feed[]): string => {
+  const feed = feeds.find(f => f.id === feedId);
+  return feed?.title || 'Unknown Feed';
+};
+
+// Helper function to format relative time
+const formatRelativeTime = (dateString: string): string => {
+  try {
+    const date = new Date(dateString);
+    
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+      return 'Unknown time';
+    }
+    
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMinutes = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    const diffWeeks = Math.floor(diffDays / 7);
+    const diffMonths = Math.floor(diffDays / 30);
+
+    // Handle future dates
+    if (diffMs < 0) {
+      return 'Future date';
+    }
+
+    if (diffMinutes < 1) {
+      return 'just now';
+    } else if (diffMinutes < 60) {
+      return diffMinutes === 1 ? '1 minute ago' : `${diffMinutes} minutes ago`;
+    } else if (diffHours < 24) {
+      return diffHours === 1 ? '1 hour ago' : `${diffHours} hours ago`;
+    } else if (diffDays < 7) {
+      return diffDays === 1 ? '1 day ago' : `${diffDays} days ago`;
+    } else if (diffWeeks < 4) {
+      return diffWeeks === 1 ? '1 week ago' : `${diffWeeks} weeks ago`;
+    } else if (diffMonths < 12) {
+      return diffMonths === 1 ? '1 month ago' : `${diffMonths} months ago`;
+    } else {
+      return date.toLocaleDateString();
+    }
+  } catch (error) {
+    console.error('Error formatting relative time:', error, dateString);
+    return 'Unknown time';
+  }
+};
 
 export default function HomePage() {
   const [feeds, setFeeds] = useState<Feed[]>([]);
@@ -609,61 +659,84 @@ export default function HomePage() {
                       </div>
                     </div>
                   ) : (
-                    <div className="p-6">
-                      {/* Magazine-style grid layout */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    <div className="max-w-4xl mx-auto">
+                      {/* Clean vertical list layout */}
+                      <div className="divide-y divide-border">
                         {filteredItems.map((item, index) => (
                           <article
                             key={item.id}
-                            className={`group cursor-pointer transition-all duration-200 hover:scale-[1.02] ${
-                              index === 0 ? 'md:col-span-2 lg:col-span-2' : ''
+                            className={`group cursor-pointer transition-colors hover:bg-accent/30 ${
+                              item.is_read ? 'opacity-70' : ''
                             }`}
                             onClick={() => handleMarkAsRead(item)}
                           >
-                            <div className={`bg-card rounded-lg overflow-hidden border hover:shadow-lg transition-shadow ${
-                              item.is_read ? 'opacity-75' : ''
-                            }`}>
-                              {/* Dummy Image */}
-                              <div className={`bg-gradient-to-br from-primary/20 to-secondary/20 ${
-                                index === 0 ? 'h-48' : 'h-32'
-                              } flex items-center justify-center`}>
-                                <Rss className={`${index === 0 ? 'h-12 w-12' : 'h-8 w-8'} text-primary/40`} />
-                              </div>
-                              
-                              <div className="p-4">
-                                <div className="flex items-start justify-between mb-2">
-                                  <h3 className={`font-semibold line-clamp-2 ${
-                                    index === 0 ? 'text-lg' : 'text-base'
-                                  } ${item.is_read ? 'text-muted-foreground' : 'text-foreground'}`}>
-                                    {item.title || 'Untitled'}
-                                  </h3>
-                                  <div className="flex items-center space-x-1 ml-2 flex-shrink-0">
+                                                        <div className="px-6 py-5">
+                              <div className="flex items-start gap-4">
+                                {/* Placeholder image */}
+                                <div className="w-16 h-16 bg-gradient-to-br from-primary/10 to-secondary/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                                  <Rss className="h-6 w-6 text-primary/40" />
+                                </div>
+                                
+                                <div className="flex-1 min-w-0 flex justify-between">
+                                  <div className="flex-1 min-w-0">
+                                    <h3 className={`text-base font-normal mb-1 leading-relaxed line-clamp-2 ${
+                                      item.is_read ? 'text-muted-foreground' : 'text-foreground hover:text-primary transition-colors'
+                                    }`}>
+                                      {item.title || 'Untitled'}
+                                    </h3>
+                                    
+                                    {item.published_at && (
+                                      <div className="mb-2 flex items-center gap-2">
+                                        <span className={`text-xs font-medium ${
+                                          item.is_read ? 'text-muted-foreground/40' : 'text-muted-foreground/60'
+                                        }`}>
+                                          {getFeedTitle(item.feed_id, feeds)}
+                                        </span>
+                                        <span className="text-muted-foreground/40">•</span>
+                                        <span className={`text-xs font-medium ${
+                                          item.is_read ? 'text-muted-foreground/60' : 'text-muted-foreground'
+                                        }`}>
+                                          {formatRelativeTime(item.published_at)}
+                                        </span>
+                                      </div>
+                                    )}
+                                    
+                                    {item.content_text && (
+                                      <p className={`text-sm mb-3 line-clamp-2 leading-relaxed ${
+                                        item.is_read ? 'text-muted-foreground/80' : 'text-muted-foreground'
+                                      }`}>
+                                        {item.content_text}
+                                      </p>
+                                    )}
+                                    
+                                    <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                                      {selectedCategory && selectedFeed && (
+                                        <span className="text-xs font-medium">
+                                          {selectedFeed.title || 'Unknown Source'}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                  
+                                  <div className="flex items-start space-x-2 flex-shrink-0">
+                                    {item.url && (
+                                      <a
+                                        href={item.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-muted-foreground hover:text-primary transition-colors p-1"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        <ExternalLink className="h-4 w-4" />
+                                      </a>
+                                    )}
                                     {!item.is_read && (
-                                      <div className="w-2 h-2 bg-primary rounded-full" />
+                                      <div className="w-2 h-2 bg-primary rounded-full mt-1" />
                                     )}
                                     {item.starred && (
                                       <Badge variant="secondary" className="text-xs">★</Badge>
                                     )}
                                   </div>
-                                </div>
-                                
-                                <div className="flex items-center justify-between text-xs text-muted-foreground">
-                                  {item.published_at && (
-                                    <span>
-                                      {new Date(item.published_at).toLocaleDateString()}
-                                    </span>
-                                  )}
-                                  {item.url && (
-                                    <a
-                                      href={item.url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-primary hover:underline"
-                                      onClick={(e) => e.stopPropagation()}
-                                    >
-                                      Read Original
-                                    </a>
-                                  )}
                                 </div>
                               </div>
                             </div>

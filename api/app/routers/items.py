@@ -57,6 +57,7 @@ async def get_feed_items(
             "feed_id": item.feed_id,
             "title": item.title,
             "url": item.url,
+            "content_text": item.content_text,
             "published_at": item.published_at,
             "fetched_at": item.fetched_at,
             "created_at": item.created_at,

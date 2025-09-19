@@ -42,6 +42,7 @@ export interface Item {
   feed_id: string;
   title: string | null;
   url: string | null;
+  content_text: string | null;
   published_at: string | null;
   fetched_at: string;
   created_at: string;
