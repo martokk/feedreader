@@ -1,7 +1,8 @@
-import { Loader2, RefreshCw, Settings, Trash2 } from 'lucide-react';
+import { Loader2, RefreshCw, Settings, Trash2, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -25,7 +26,7 @@ interface FeedSettingsDialogProps {
   onOpenChange: (open: boolean) => void;
   feed: Feed | null;
   categories: Category[];
-  onFeedUpdated: (feed: Feed) => void;
+  onFeedUpdated?: (feed: Feed) => void;
   onFeedDeleted: (feedId: string) => void;
 }
 
@@ -39,8 +40,8 @@ export function FeedSettingsDialog({
 }: FeedSettingsDialogProps) {
   const [title, setTitle] = useState('');
   const [intervalSeconds, setIntervalSeconds] = useState(900);
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
-  const [currentCategoryId, setCurrentCategoryId] = useState<string>('');
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
+  const [currentCategoryIds, setCurrentCategoryIds] = useState<string[]>([]);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -58,14 +59,13 @@ export function FeedSettingsDialog({
   const loadFeedCategories = async (feedId: string) => {
     try {
       const feedCategories = await api.getFeedCategories(feedId);
-      // Set the first category as selected, or empty if no categories
-      const currentCategory = feedCategories.length > 0 ? feedCategories[0].id : '';
-      setCurrentCategoryId(currentCategory);
-      setSelectedCategoryId(currentCategory);
+      const categoryIds = feedCategories.map(cat => cat.id);
+      setCurrentCategoryIds(categoryIds);
+      setSelectedCategoryIds([...categoryIds]);
     } catch (error) {
       console.error('Failed to load feed categories:', error);
-      setCurrentCategoryId('');
-      setSelectedCategoryId('');
+      setCurrentCategoryIds([]);
+      setSelectedCategoryIds([]);
     }
   };
 
@@ -82,28 +82,18 @@ export function FeedSettingsDialog({
       });
 
       // Handle category assignment changes
-      if (selectedCategoryId !== currentCategoryId) {
+      if (selectedCategoryIds.length !== currentCategoryIds.length || !selectedCategoryIds.every(id => currentCategoryIds.includes(id))) {
         try {
-          // Remove from current category if it has one
-          if (currentCategoryId) {
-            await api.removeFeedFromCategory(feed.id, currentCategoryId);
-          }
-          
-          // Add to new category if one is selected
-          if (selectedCategoryId) {
-            await api.addFeedToCategory(feed.id, selectedCategoryId);
-            toast.success('Feed moved to category successfully');
-          } else {
-            toast.success('Feed removed from category');
-          }
+          await api.updateFeedCategories(feed.id, selectedCategoryIds);
+          toast.success('Feed categories updated successfully');
         } catch (error) {
-          console.error('Failed to update feed category:', error);
-          toast.error('Feed updated but failed to update category');
+          console.error('Failed to update feed categories:', error);
+          toast.error('Feed updated but failed to update categories');
         }
       }
 
       toast.success('Feed updated successfully');
-      onFeedUpdated(updatedFeed);
+      onFeedUpdated?.(updatedFeed);
       onOpenChange(false);
     } catch (error) {
       console.error('Failed to update feed:', error);
@@ -203,20 +193,32 @@ export function FeedSettingsDialog({
             {categories.length > 0 && (
               <div className="space-y-2">
                 <Label htmlFor="category">Category</Label>
-                <select
-                  id="category"
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  value={selectedCategoryId}
-                  onChange={(e) => setSelectedCategoryId(e.target.value)}
-                  disabled={isUpdating}
-                >
-                  <option value="">No category</option>
+                <div className="flex flex-wrap items-center gap-2 p-2 border border-input rounded-md bg-muted">
                   {categories.map((category) => (
-                    <option key={category.id} value={category.id}>
+                    <Badge
+                      key={category.id}
+                      variant={selectedCategoryIds.includes(category.id) ? 'default' : 'secondary'}
+                      className="flex items-center gap-1 cursor-pointer"
+                      onClick={() => {
+                        setSelectedCategoryIds(prev => {
+                          const newSelected = [...prev];
+                          const index = newSelected.indexOf(category.id);
+                          if (index > -1) {
+                            newSelected.splice(index, 1);
+                          } else {
+                            newSelected.push(category.id);
+                          }
+                          return newSelected;
+                        });
+                      }}
+                    >
                       {category.name}
-                    </option>
+                      {selectedCategoryIds.includes(category.id) && (
+                        <X className="h-3 w-3" />
+                      )}
+                    </Badge>
                   ))}
-                </select>
+                </div>
               </div>
             )}
 

@@ -1,7 +1,8 @@
-import { CheckCircle, Loader2, Plus, XCircle } from 'lucide-react';
+import { CheckCircle, Loader2, Plus, X, XCircle } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -33,7 +34,7 @@ export function AddFeedDialog({
   const [url, setUrl] = useState('');
   const [title, setTitle] = useState('');
   const [intervalSeconds, setIntervalSeconds] = useState(900); // 15 minutes default
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
   const [isValidating, setIsValidating] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [validation, setValidation] = useState<FeedValidation | null>(null);
@@ -45,7 +46,7 @@ export function AddFeedDialog({
       setUrl('');
       setTitle('');
       setIntervalSeconds(900);
-      setSelectedCategoryId('');
+      setSelectedCategoryIds([]);
       setValidation(null);
       setValidationError(null);
     }
@@ -103,13 +104,12 @@ export function AddFeedDialog({
       });
 
       // If a category is selected, assign the feed to it
-      if (selectedCategoryId) {
+      if (selectedCategoryIds.length > 0) {
         try {
-          // Note: We would need an API endpoint to assign feeds to categories
-          // For now, we'll skip this and add it when we implement category assignment
-          console.log('Category assignment not yet implemented:', selectedCategoryId);
+          await api.assignFeedToCategories(newFeed.id, selectedCategoryIds);
+          console.log('Feed assigned to categories:', selectedCategoryIds);
         } catch (error) {
-          console.warn('Failed to assign category:', error);
+          console.warn('Failed to assign categories:', error);
           // Don't fail the entire operation for category assignment
         }
       }
@@ -201,21 +201,33 @@ export function AddFeedDialog({
 
           {categories.length > 0 && (
             <div className="space-y-2">
-              <Label htmlFor="category">Category (Optional)</Label>
-              <select
-                id="category"
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                value={selectedCategoryId}
-                onChange={(e) => setSelectedCategoryId(e.target.value)}
-                disabled={isCreating}
-              >
-                <option value="">No category</option>
+              <Label htmlFor="category">Categories (Optional)</Label>
+              <div className="flex flex-wrap items-center gap-2 p-2 border border-input rounded-md bg-muted">
                 {categories.map((category) => (
-                  <option key={category.id} value={category.id}>
+                  <Badge
+                    key={category.id}
+                    variant={selectedCategoryIds.includes(category.id) ? 'default' : 'secondary'}
+                    className="flex items-center gap-1 cursor-pointer"
+                    onClick={() => {
+                      setSelectedCategoryIds(prev => {
+                        const newSelected = [...prev];
+                        const index = newSelected.indexOf(category.id);
+                        if (index > -1) {
+                          newSelected.splice(index, 1);
+                        } else {
+                          newSelected.push(category.id);
+                        }
+                        return newSelected;
+                      });
+                    }}
+                  >
                     {category.name}
-                  </option>
+                    {selectedCategoryIds.includes(category.id) && (
+                      <X className="h-3 w-3" />
+                    )}
+                  </Badge>
                 ))}
-              </select>
+              </div>
             </div>
           )}
 

@@ -31,6 +31,7 @@ export default function HomePage() {
   const [sseClient, setSseClient] = useState<SSEClient | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connecting' | 'connected'>('disconnected');
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+  const [draggedFeed, setDraggedFeed] = useState<Feed | null>(null);
   
   // Dialog states
   const [showAddFeedDialog, setShowAddFeedDialog] = useState(false);
@@ -251,6 +252,72 @@ export default function HomePage() {
     setShowCategoryDialog(true);
   };
 
+  const handleDragStart = (e: React.DragEvent, feed: Feed) => {
+    setDraggedFeed(feed);
+    e.dataTransfer.setData('text/plain', feed.id);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragEnd = () => {
+    setDraggedFeed(null);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDropOnCategory = async (e: React.DragEvent, targetCategoryId: string) => {
+    e.preventDefault();
+    
+    if (!draggedFeed) return;
+
+    try {
+      // Get current categories for the feed
+      const currentCategories = await api.getFeedCategories(draggedFeed.id);
+      const currentCategoryIds = currentCategories.map(cat => cat.id);
+      
+      // Add the target category if it's not already there
+      if (!currentCategoryIds.includes(targetCategoryId)) {
+        const newCategoryIds = [...currentCategoryIds, targetCategoryId];
+        await api.updateFeedCategories(draggedFeed.id, newCategoryIds);
+        
+        // Refresh the feeds data
+        await loadInitialData();
+        
+        toast.success('Feed moved to category successfully');
+      } else {
+        toast.info('Feed is already in this category');
+      }
+    } catch (error) {
+      console.error('Failed to move feed to category:', error);
+      toast.error('Failed to move feed to category');
+    } finally {
+      setDraggedFeed(null);
+    }
+  };
+
+  const handleDropOnUncategorized = async (e: React.DragEvent) => {
+    e.preventDefault();
+    
+    if (!draggedFeed) return;
+
+    try {
+      // Remove feed from all categories (make it uncategorized)
+      await api.updateFeedCategories(draggedFeed.id, []);
+      
+      // Refresh the feeds data
+      await loadInitialData();
+      
+      toast.success('Feed moved to uncategorized');
+    } catch (error) {
+      console.error('Failed to move feed to uncategorized:', error);
+      toast.error('Failed to move feed to uncategorized');
+    } finally {
+      setDraggedFeed(null);
+    }
+  };
+
   // Get feeds by category
   const getFeedsByCategory = (categoryId: string) => {
     if (feedsByCategory[categoryId]) {
@@ -358,8 +425,10 @@ export default function HomePage() {
                     <div
                       className={`flex items-center justify-between p-2 rounded-lg cursor-pointer transition-colors hover:bg-accent group ${
                         selectedCategory?.id === category.id ? 'bg-accent' : ''
-                      }`}
+                      } ${draggedFeed ? 'border-2 border-dashed border-primary/50' : ''}`}
                       onClick={() => handleCategorySelect(category)}
+                      onDragOver={handleDragOver}
+                      onDrop={(e) => handleDropOnCategory(e, category.id)}
                     >
                       <div className="flex items-center space-x-2 flex-1 min-w-0">
                         <Button
@@ -379,7 +448,7 @@ export default function HomePage() {
                         </Button>
                         {category.color && (
                           <div 
-                            className="w-3 h-3 rounded-full flex-shrink-0" 
+                            className="w-3 h-3 rounded-full border"
                             style={{ backgroundColor: category.color }}
                           />
                         )}
@@ -405,10 +474,13 @@ export default function HomePage() {
                         {getFeedsByCategory(category.id).map((feed) => (
                           <div
                             key={feed.id}
+                            draggable
                             className={`flex items-center justify-between p-2 rounded-lg cursor-pointer transition-colors hover:bg-accent ${
                               selectedFeed?.id === feed.id ? 'bg-accent' : ''
-                            }`}
+                            } ${draggedFeed?.id === feed.id ? 'opacity-50' : ''}`}
                             onClick={() => handleFeedSelect(feed)}
+                            onDragStart={(e) => handleDragStart(e, feed)}
+                            onDragEnd={handleDragEnd}
                           >
                             <div className="flex items-center space-x-2 flex-1 min-w-0">
                               <Rss className="h-3 w-3 flex-shrink-0" />
@@ -430,14 +502,25 @@ export default function HomePage() {
                 {/* Uncategorized Feeds */}
                 {getUncategorizedFeeds().length > 0 && (
                   <div className="space-y-1">
-                    <h4 className="text-sm font-medium text-muted-foreground px-2 py-1">Uncategorized</h4>
+                    <h4 
+                      className={`text-sm font-medium text-muted-foreground px-2 py-1 ${
+                        draggedFeed ? 'border-2 border-dashed border-primary/50 rounded' : ''
+                      }`}
+                      onDragOver={handleDragOver}
+                      onDrop={handleDropOnUncategorized}
+                    >
+                      Uncategorized
+                    </h4>
                     {getUncategorizedFeeds().map((feed) => (
                       <div
                         key={feed.id}
-                        className={`flex items-center justify-between p-2 rounded-lg cursor-pointer transition-colors hover:bg-accent ${
+                        draggable
+                        className={`flex items-center justify-between p-2 rounded-lg cursor-pointer transition-colors hover:bg-accent group ${
                           selectedFeed?.id === feed.id ? 'bg-accent' : ''
-                        }`}
+                        } ${draggedFeed?.id === feed.id ? 'opacity-50' : ''}`}
                         onClick={() => handleFeedSelect(feed)}
+                        onDragStart={(e) => handleDragStart(e, feed)}
+                        onDragEnd={handleDragEnd}
                       >
                         <div className="flex items-center space-x-2 flex-1 min-w-0">
                           <Rss className="h-4 w-4 flex-shrink-0" />
