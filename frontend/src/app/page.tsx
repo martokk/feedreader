@@ -1,13 +1,12 @@
 'use client';
 
-import { ChevronDown, ChevronRight, ExternalLink, Filter, Folder, FolderPlus, Plus, RefreshCw, Rss, Search, Settings, Upload } from 'lucide-react';
+import { ChevronDown, ChevronRight, ExternalLink, Filter, Folder, FolderPlus, Plus, RefreshCw, Rss, Settings, Upload } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 import { api } from '@/lib/api';
@@ -77,7 +76,6 @@ export default function HomePage() {
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [loading, setLoading] = useState(true);
   const [itemsLoading, setItemsLoading] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
   const [filterUnread, setFilterUnread] = useState(true);
   const [sseClient, setSseClient] = useState<SSEClient | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connecting' | 'connected'>('disconnected');
@@ -241,7 +239,6 @@ export default function HomePage() {
 
   const filteredItems = items.filter(item => {
     if (filterUnread && item.is_read) return false;
-    if (searchTerm && !item.title?.toLowerCase().includes(searchTerm.toLowerCase())) return false;
     return true;
   });
 
@@ -294,14 +291,20 @@ export default function HomePage() {
     setShowFeedSettingsDialog(true);
   };
 
-  const handleOpenCategoryEdit = (category: Category) => {
+  const handleOpenCategoryCreation = () => {
+    setSelectedCategoryForEdit(null);
+    setShowCategoryDialog(true);
+  };
+
+  const handleOpenCategorySettings = (category: Category) => {
     setSelectedCategoryForEdit(category);
     setShowCategoryDialog(true);
   };
 
-  const handleOpenCategoryCreate = () => {
+  const handleCloseCategoryDialog = async () => {
+    setShowCategoryDialog(false);
     setSelectedCategoryForEdit(null);
-    setShowCategoryDialog(true);
+    await loadInitialData(); // Refresh data after category edit
   };
 
   const handleOpmlImport = async (file: File) => {
@@ -451,28 +454,17 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Search Bar */}
-          <div className="flex-1 max-w-md mx-8">
-            {(selectedFeed || selectedCategory) && (
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search articles..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-            )}
-          </div>
-
           <div className="flex items-center space-x-2">
             <Button variant="outline" size="sm" onClick={() => loadInitialData()}>
               <RefreshCw className="h-4 w-4" />
             </Button>
-            <Button size="sm" onClick={() => setShowAddFeedDialog(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Feed
+            {/* Placeholder for Dark/Light Mode Toggle */}
+            <Button variant="outline" size="sm">
+              Theme
+            </Button>
+            {/* Placeholder for Settings */}
+            <Button variant="outline" size="sm">
+              <Settings className="h-4 w-4" />
             </Button>
           </div>
         </div>
@@ -502,7 +494,7 @@ export default function HomePage() {
                         <Rss className="h-4 w-4 mr-2" />
                         Add Feed
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={handleOpenCategoryCreate}>
+                      <DropdownMenuItem onClick={handleOpenCategoryCreation}>
                         <FolderPlus className="h-4 w-4 mr-2" />
                         Add Category
                       </DropdownMenuItem>
@@ -552,22 +544,11 @@ export default function HomePage() {
                         <Folder className="h-4 w-4 flex-shrink-0" />
                         <span className="flex-1 truncate">{category.name}</span>
                         {(category.unread_count || 0) > 0 && (
-                          <span className="ml-auto text-xs font-semibold text-muted-foreground/80">
+                          <span className="ml-auto text-xs font-semibold text-muted-foreground/80 pr-2">
                             {(category.unread_count || 0)}
                           </span>
                         )}
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleOpenCategoryEdit(category);
-                        }}
-                      >
-                        <Settings className="h-3 w-3" />
-                      </Button>
                     </div>
 
                     {/* Category Feeds */}
@@ -587,12 +568,12 @@ export default function HomePage() {
                             <div className="flex items-center space-x-2 flex-1 min-w-0">
                               <Rss className="h-3 w-3 flex-shrink-0" />
                               <span className="text-sm truncate">{feed.title || 'Untitled Feed'}</span>
-                              {(feed.unread_count || 0) > 0 && (
-                                <span className="ml-auto text-xs font-semibold text-muted-foreground/80">
-                                  {(feed.unread_count || 0)}
-                                </span>
-                              )}
                             </div>
+                            {(feed.unread_count || 0) > 0 && (
+                              <span className="ml-auto text-xs font-semibold text-muted-foreground/80 pr-2">
+                                {(feed.unread_count || 0)}
+                              </span>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -628,23 +609,10 @@ export default function HomePage() {
                           <span className="font-medium truncate">{feed.title || 'Untitled Feed'}</span>
                         </div>
                         {(feed.unread_count || 0) > 0 && (
-                          <span className="ml-auto text-xs font-semibold text-muted-foreground/80">
+                          <span className="ml-auto text-xs font-semibold text-muted-foreground/80 pr-2">
                             {(feed.unread_count || 0)}
                           </span>
                         )}
-                        <div className="flex items-center space-x-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleOpenFeedSettings(feed);
-                            }}
-                          >
-                            <Settings className="h-3 w-3" />
-                          </Button>
-                        </div>
                       </div>
                     ))}
                   </div>
@@ -680,6 +648,10 @@ export default function HomePage() {
                         )}
                       </div>
                     )}
+                    {selectedCategory && (
+                      <p className="text-muted-foreground mt-1">
+                      </p>
+                    )}
                   </div>
                   <div className="flex items-center space-x-2">
                     <Button
@@ -695,6 +667,15 @@ export default function HomePage() {
                         variant="outline" 
                         size="sm"
                         onClick={() => handleOpenFeedSettings(selectedFeed)}
+                      >
+                        <Settings className="h-4 w-4" />
+                      </Button>
+                    )}
+                    {selectedCategory && (
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => handleOpenCategorySettings(selectedCategory)}
                       >
                         <Settings className="h-4 w-4" />
                       </Button>
@@ -840,7 +821,7 @@ export default function HomePage() {
 
       <FeedSettingsDialog
         open={showFeedSettingsDialog}
-        onOpenChange={setShowFeedSettingsDialog}
+        onOpenChange={() => setShowFeedSettingsDialog(false)}
         feed={selectedFeedForSettings}
         categories={categories}
         onFeedUpdated={handleFeedUpdated}
@@ -849,10 +830,10 @@ export default function HomePage() {
 
       <CategoryDialog
         open={showCategoryDialog}
-        onOpenChange={setShowCategoryDialog}
-        category={selectedCategoryForEdit}
+        onOpenChange={handleCloseCategoryDialog}
         onCategoryCreated={handleCategoryCreated}
         onCategoryUpdated={handleCategoryUpdated}
+        category={selectedCategoryForEdit}
       />
     </div>
   );
