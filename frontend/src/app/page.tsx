@@ -1,11 +1,12 @@
 'use client';
 
-import { ChevronDown, ChevronRight, ExternalLink, Filter, Folder, FolderPlus, Plus, RefreshCw, Rss, Search, Settings } from 'lucide-react';
+import { ChevronDown, ChevronRight, ExternalLink, Filter, Folder, FolderPlus, Plus, RefreshCw, Rss, Search, Settings, Upload } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
@@ -77,7 +78,7 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [itemsLoading, setItemsLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterUnread, setFilterUnread] = useState(false);
+  const [filterUnread, setFilterUnread] = useState(true);
   const [sseClient, setSseClient] = useState<SSEClient | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connecting' | 'connected'>('disconnected');
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
@@ -89,6 +90,7 @@ export default function HomePage() {
   const [showFeedSettingsDialog, setShowFeedSettingsDialog] = useState(false);
   const [selectedFeedForSettings, setSelectedFeedForSettings] = useState<Feed | null>(null);
   const [selectedCategoryForEdit, setSelectedCategoryForEdit] = useState<Category | null>(null);
+  const [showOpmlImportDialog, setShowOpmlImportDialog] = useState(false);
 
   // Load initial data
   useEffect(() => {
@@ -302,6 +304,31 @@ export default function HomePage() {
     setShowCategoryDialog(true);
   };
 
+  const handleOpmlImport = async (file: File) => {
+    try {
+      const result = await api.importOpml(file);
+      toast.success(`OPML imported successfully! Created ${result.feeds_created} feeds, skipped ${result.feeds_skipped} duplicates.`);
+      if (result.errors.length > 0) {
+        console.warn('Import errors:', result.errors);
+        toast.warning(`Some feeds had errors: ${result.errors.length} issues`);
+      }
+      // Refresh the feeds data
+      await loadInitialData();
+    } catch (error) {
+      console.error('Failed to import OPML:', error);
+      toast.error('Failed to import OPML file');
+    }
+  };
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      handleOpmlImport(file);
+    }
+    // Reset the input value so the same file can be selected again
+    event.target.value = '';
+  };
+
   const handleDragStart = (e: React.DragEvent, feed: Feed) => {
     setDraggedFeed(feed);
     e.dataTransfer.setData('text/plain', feed.id);
@@ -456,18 +483,42 @@ export default function HomePage() {
         <div className="w-80 border-r bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
           <ScrollArea className="h-[calc(100vh-4rem)]">
             <div className="p-4 space-y-2">
-              {/* Categories Section */}
+              {/* Feeds Section */}
               <div className="space-y-1">
                 <div className="flex items-center justify-between px-2 py-1">
-                  <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Categories</h3>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleOpenCategoryCreate}
-                    className="h-6 w-6 p-0"
-                  >
-                    <FolderPlus className="h-3 w-3" />
-                  </Button>
+                  <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Feeds</h3>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0"
+                      >
+                        <Plus className="h-3 w-3" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => setShowAddFeedDialog(true)}>
+                        <Rss className="h-4 w-4 mr-2" />
+                        Add Feed
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={handleOpenCategoryCreate}>
+                        <FolderPlus className="h-4 w-4 mr-2" />
+                        Add Category
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => document.getElementById('opml-import')?.click()}>
+                        <Upload className="h-4 w-4 mr-2" />
+                        Import OPML
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                  <input
+                    id="opml-import"
+                    type="file"
+                    accept=".opml,.xml"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                  />
                 </div>
 
                 {categories.map((category) => (
