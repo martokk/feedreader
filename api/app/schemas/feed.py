@@ -61,6 +61,7 @@ class FeedResponse(BaseModel):
     interval_seconds: int
     created_at: datetime
     updated_at: datetime
+    unread_count: int = 0
 
     class Config:
         from_attributes = True
@@ -70,6 +71,7 @@ class FeedWithCategories(FeedResponse):
     """Feed response with associated categories."""
 
     categories: List["CategoryResponse"] = []
+    unread_count: int = 0
 
     class Config:
         from_attributes = True

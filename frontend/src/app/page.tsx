@@ -1,13 +1,12 @@
 'use client';
 
-import { ChevronDown, ChevronRight, ExternalLink, Filter, Folder, FolderPlus, Plus, RefreshCw, Rss, Search, Settings } from 'lucide-react';
+import { ChevronDown, ChevronRight, ExternalLink, Filter, Folder, FolderPlus, Plus, RefreshCw, Rss, Settings, Upload } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 import { api } from '@/lib/api';
 import { SSEClient } from '@/lib/sse';
@@ -76,8 +75,7 @@ export default function HomePage() {
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [loading, setLoading] = useState(true);
   const [itemsLoading, setItemsLoading] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterUnread, setFilterUnread] = useState(false);
+  const [filterUnread, setFilterUnread] = useState(true);
   const [sseClient, setSseClient] = useState<SSEClient | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connecting' | 'connected'>('disconnected');
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
@@ -239,7 +237,6 @@ export default function HomePage() {
 
   const filteredItems = items.filter(item => {
     if (filterUnread && item.is_read) return false;
-    if (searchTerm && !item.title?.toLowerCase().includes(searchTerm.toLowerCase())) return false;
     return true;
   });
 
@@ -292,14 +289,45 @@ export default function HomePage() {
     setShowFeedSettingsDialog(true);
   };
 
-  const handleOpenCategoryEdit = (category: Category) => {
+  const handleOpenCategoryCreation = () => {
+    setSelectedCategoryForEdit(null);
+    setShowCategoryDialog(true);
+  };
+
+  const handleOpenCategorySettings = (category: Category) => {
     setSelectedCategoryForEdit(category);
     setShowCategoryDialog(true);
   };
 
-  const handleOpenCategoryCreate = () => {
+  const handleCloseCategoryDialog = async () => {
+    setShowCategoryDialog(false);
     setSelectedCategoryForEdit(null);
-    setShowCategoryDialog(true);
+    await loadInitialData(); // Refresh data after category edit
+  };
+
+  const handleOpmlImport = async (file: File) => {
+    try {
+      const result = await api.importOpml(file);
+      toast.success(`OPML imported successfully! Created ${result.feeds_created} feeds, skipped ${result.feeds_skipped} duplicates.`);
+      if (result.errors.length > 0) {
+        console.warn('Import errors:', result.errors);
+        toast.warning(`Some feeds had errors: ${result.errors.length} issues`);
+      }
+      // Refresh the feeds data
+      await loadInitialData();
+    } catch (error) {
+      console.error('Failed to import OPML:', error);
+      toast.error('Failed to import OPML file');
+    }
+  };
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      handleOpmlImport(file);
+    }
+    // Reset the input value so the same file can be selected again
+    event.target.value = '';
   };
 
   const handleDragStart = (e: React.DragEvent, feed: Feed) => {
@@ -399,76 +427,125 @@ export default function HomePage() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="h-screen bg-background flex flex-col">
       {/* Header */}
       <header className="border-b bg-card/50 backdrop-blur supports-[backdrop-filter]:bg-card/50 sticky top-0 z-50">
-        <div className="h-16 px-6 flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2">
-              <Rss className="h-6 w-6 text-primary" />
-              <h1 className="text-xl font-bold">RSS Reader</h1>
-            </div>
-            
-            {/* Connection Status */}
-            <div className="flex items-center space-x-2">
-              <div className={`w-2 h-2 rounded-full ${
-                connectionStatus === 'connected' ? 'bg-green-500' :
-                connectionStatus === 'connecting' ? 'bg-yellow-500' :
-                'bg-red-500'
-              }`} />
-              <span className="text-xs text-muted-foreground">
-                {connectionStatus === 'connected' ? 'Live' :
-                 connectionStatus === 'connecting' ? 'Connecting...' :
-                 'Offline'}
-              </span>
-            </div>
-          </div>
-
-          {/* Search Bar */}
-          <div className="flex-1 max-w-md mx-8">
-            {(selectedFeed || selectedCategory) && (
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search articles..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
+        <div className="h-16 flex">
+          {/* Sidebar Header */}
+          <div className="w-80 px-6 flex items-center justify-between border-r">
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2">
+                <Rss className="h-6 w-6 text-primary" />
+                <h1 className="text-xl font-bold">RSS Reader</h1>
               </div>
-            )}
+              
+              {/* Connection Status */}
+              <div className="flex items-center space-x-2">
+                <div className={`w-2 h-2 rounded-full ${
+                  connectionStatus === 'connected' ? 'bg-green-500' :
+                  connectionStatus === 'connecting' ? 'bg-yellow-500' :
+                  'bg-red-500'
+                }`} />
+                <span className="text-xs text-muted-foreground">
+                  {connectionStatus === 'connected' ? 'Live' :
+                   connectionStatus === 'connecting' ? 'Connecting...' :
+                   'Offline'}
+                </span>
+              </div>
+            </div>
+
+            {/* Plus Button */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setShowAddFeedDialog(true)}>
+                  <Rss className="h-4 w-4 mr-2" />
+                  Add Feed
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleOpenCategoryCreation}>
+                  <FolderPlus className="h-4 w-4 mr-2" />
+                  Add Category
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => document.getElementById('opml-import')?.click()}>
+                  <Upload className="h-4 w-4 mr-2" />
+                  Import OPML
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <input
+              id="opml-import"
+              type="file"
+              accept=".opml,.xml"
+              onChange={handleFileUpload}
+              className="hidden"
+            />
           </div>
 
-          <div className="flex items-center space-x-2">
-            <Button variant="outline" size="sm" onClick={() => loadInitialData()}>
-              <RefreshCw className="h-4 w-4" />
-            </Button>
-            <Button size="sm" onClick={() => setShowAddFeedDialog(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Feed
-            </Button>
+          {/* Main Content Header */}
+          <div className="flex-1 px-6 flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              {(selectedFeed || selectedCategory) && (
+                <div>
+                  <h2 className="text-lg font-semibold">
+                    {selectedFeed ? selectedFeed.title || 'Untitled Feed' : selectedCategory?.name}
+                  </h2>
+                  <p className="text-sm text-muted-foreground">
+                    {selectedFeed ? selectedFeed.url : selectedCategory?.description}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center space-x-2">
+              {(selectedFeed || selectedCategory) && (
+                <>
+                  <Button
+                    variant={filterUnread ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setFilterUnread(!filterUnread)}
+                  >
+                    <Filter className="h-4 w-4 mr-2" />
+                    {filterUnread ? "Show All" : "Unread Only"} ({unreadCount})
+                  </Button>
+                  {selectedFeed && (
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => handleOpenFeedSettings(selectedFeed)}
+                    >
+                      <Settings className="h-4 w-4" />
+                    </Button>
+                  )}
+                  {selectedCategory && (
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => handleOpenCategorySettings(selectedCategory)}
+                    >
+                      <Settings className="h-4 w-4" />
+                    </Button>
+                  )}
+                </>
+              )}
+            </div>
           </div>
         </div>
       </header>
 
-      <div className="flex-1 flex">
+      <div className="flex h-[calc(100vh-4rem)]">
         {/* Sidebar */}
-        <div className="w-80 border-r bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-          <ScrollArea className="h-[calc(100vh-4rem)]">
+        <div className="w-80 border-r bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 relative">
+          <div className="h-[calc(100vh-4rem-4rem)] overflow-y-auto">
             <div className="p-4 space-y-2">
-              {/* Categories Section */}
+              {/* Feeds Section */}
               <div className="space-y-1">
-                <div className="flex items-center justify-between px-2 py-1">
-                  <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Categories</h3>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleOpenCategoryCreate}
-                    className="h-6 w-6 p-0"
-                  >
-                    <FolderPlus className="h-3 w-3" />
-                  </Button>
-                </div>
 
                 {categories.map((category) => (
                   <div key={category.id} className="space-y-1">
@@ -490,11 +567,7 @@ export default function HomePage() {
                             toggleCategoryExpanded(category.id);
                           }}
                         >
-                          {expandedCategories.has(category.id) ? (
-                            <ChevronDown className="h-3 w-3" />
-                          ) : (
-                            <ChevronRight className="h-3 w-3" />
-                          )}
+                          {expandedCategories.has(category.id) ? <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />}
                         </Button>
                         {category.color && (
                           <div 
@@ -503,19 +576,13 @@ export default function HomePage() {
                           />
                         )}
                         <Folder className="h-4 w-4 flex-shrink-0" />
-                        <span className="font-medium truncate">{category.name}</span>
+                        <span className="flex-1 truncate">{category.name}</span>
+                        {(category.unread_count || 0) > 0 && (
+                          <span className="ml-auto text-xs font-semibold text-muted-foreground/80 pr-2">
+                            {(category.unread_count || 0)}
+                          </span>
+                        )}
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleOpenCategoryEdit(category);
-                        }}
-                      >
-                        <Settings className="h-3 w-3" />
-                      </Button>
                     </div>
 
                     {/* Category Feeds */}
@@ -536,12 +603,11 @@ export default function HomePage() {
                               <Rss className="h-3 w-3 flex-shrink-0" />
                               <span className="text-sm truncate">{feed.title || 'Untitled Feed'}</span>
                             </div>
-                            <Badge 
-                              variant={feed.last_status && feed.last_status >= 200 && feed.last_status < 400 ? 'default' : 'destructive'} 
-                              className="text-xs"
-                            >
-                              {feed.last_status && feed.last_status >= 200 && feed.last_status < 400 ? 'OK' : 'Error'}
-                            </Badge>
+                            {(feed.unread_count || 0) > 0 && (
+                              <span className="ml-auto text-xs font-semibold text-muted-foreground/80 pr-2">
+                                {(feed.unread_count || 0)}
+                              </span>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -576,74 +642,39 @@ export default function HomePage() {
                           <Rss className="h-4 w-4 flex-shrink-0" />
                           <span className="font-medium truncate">{feed.title || 'Untitled Feed'}</span>
                         </div>
-                        <div className="flex items-center space-x-2">
-                          <Badge 
-                            variant={feed.last_status && feed.last_status >= 200 && feed.last_status < 400 ? 'default' : 'destructive'} 
-                            className="text-xs"
-                          >
-                            {feed.last_status && feed.last_status >= 200 && feed.last_status < 400 ? 'OK' : 'Error'}
-                          </Badge>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleOpenFeedSettings(feed);
-                            }}
-                          >
-                            <Settings className="h-3 w-3" />
-                          </Button>
-                        </div>
+                        {(feed.unread_count || 0) > 0 && (
+                          <span className="ml-auto text-xs font-semibold text-muted-foreground/80 pr-2">
+                            {(feed.unread_count || 0)}
+                          </span>
+                        )}
                       </div>
                     ))}
                   </div>
                 )}
               </div>
             </div>
-          </ScrollArea>
+          </div>
+          
+          {/* Sidebar Footer - Absolutely pinned to bottom */}
+          <div className="absolute bottom-0 left-0 right-0 border-t p-4 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+            <div className="flex items-center justify-center space-x-2">
+              <Button variant="outline" size="sm" onClick={() => loadInitialData()}>
+                <RefreshCw className="h-4 w-4" />
+              </Button>
+              <Button variant="outline" size="sm">
+                Theme
+              </Button>
+              <Button variant="outline" size="sm">
+                <Settings className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
         </div>
 
         {/* Main Content */}
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1">
           {(selectedFeed || selectedCategory) ? (
-            <>
-              {/* Content Header */}
-              <div className="border-b p-6">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h2 className="text-2xl font-bold">
-                      {selectedFeed ? selectedFeed.title || 'Untitled Feed' : selectedCategory?.name}
-                    </h2>
-                    <p className="text-muted-foreground mt-1">
-                      {selectedFeed ? selectedFeed.url : selectedCategory?.description}
-                    </p>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Button
-                      variant={filterUnread ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setFilterUnread(!filterUnread)}
-                    >
-                      <Filter className="h-4 w-4 mr-2" />
-                      Unread ({unreadCount})
-                    </Button>
-                    {selectedFeed && (
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => handleOpenFeedSettings(selectedFeed)}
-                      >
-                        <Settings className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Articles Content */}
-              <div className="flex-1 overflow-hidden">
-                <ScrollArea className="h-full">
+            <div className="h-[calc(100vh-4rem)] overflow-y-auto">
                   {itemsLoading ? (
                     <div className="flex items-center justify-center h-64">
                       <div className="text-center">
@@ -662,7 +693,7 @@ export default function HomePage() {
                     <div className="max-w-4xl mx-auto">
                       {/* Clean vertical list layout */}
                       <div className="divide-y divide-border">
-                        {filteredItems.map((item, index) => (
+                        {filteredItems.map((item) => (
                           <article
                             key={item.id}
                             className={`group cursor-pointer transition-colors hover:bg-accent/30 ${
@@ -745,11 +776,9 @@ export default function HomePage() {
                       </div>
                     </div>
                   )}
-                </ScrollArea>
-              </div>
-            </>
+            </div>
           ) : (
-            <div className="flex-1 flex items-center justify-center">
+            <div className="h-[calc(100vh-4rem)] flex items-center justify-center">
               <div className="text-center max-w-md">
                 <Rss className="h-24 w-24 mx-auto mb-6 text-muted-foreground opacity-50" />
                 <h3 className="text-2xl font-semibold mb-4">Welcome to RSS Reader</h3>
@@ -778,7 +807,7 @@ export default function HomePage() {
 
       <FeedSettingsDialog
         open={showFeedSettingsDialog}
-        onOpenChange={setShowFeedSettingsDialog}
+        onOpenChange={() => setShowFeedSettingsDialog(false)}
         feed={selectedFeedForSettings}
         categories={categories}
         onFeedUpdated={handleFeedUpdated}
@@ -787,10 +816,10 @@ export default function HomePage() {
 
       <CategoryDialog
         open={showCategoryDialog}
-        onOpenChange={setShowCategoryDialog}
-        category={selectedCategoryForEdit}
+        onOpenChange={handleCloseCategoryDialog}
         onCategoryCreated={handleCategoryCreated}
         onCategoryUpdated={handleCategoryUpdated}
+        category={selectedCategoryForEdit}
       />
     </div>
   );

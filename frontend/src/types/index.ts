@@ -8,6 +8,7 @@ export interface Feed {
   interval_seconds: number;
   created_at: string;
   updated_at: string;
+  unread_count?: number;
 }
 
 export interface FeedCreate {
@@ -63,6 +64,7 @@ export interface Category {
   order: number;
   created_at: string;
   updated_at: string;
+  unread_count?: number;
 }
 
 export interface CategoryCreate {
