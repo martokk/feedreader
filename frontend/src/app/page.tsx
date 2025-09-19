@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronDown, ChevronRight, ExternalLink, Filter, Folder, FolderPlus, Plus, RefreshCw, Rss, Settings, Upload } from 'lucide-react';
+import { ChevronDown, ChevronRight, Edit, ExternalLink, Filter, Folder, FolderPlus, MoreVertical, Plus, RefreshCw, Rss, Settings, Upload } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -490,51 +490,66 @@ export default function HomePage() {
 
           {/* Main Content Header */}
           <div className="flex-1 px-6 flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              {(selectedFeed || selectedCategory) && (
-                <div>
+            {(selectedFeed || selectedCategory) ? (
+              <>
+                {/* Left spacer */}
+                <div className="flex-1"></div>
+                
+                {/* Centered title with unread counter */}
+                <div className="flex items-center space-x-2">
                   <h2 className="text-lg font-semibold">
                     {selectedFeed ? selectedFeed.title || 'Untitled Feed' : selectedCategory?.name}
                   </h2>
-                  <p className="text-sm text-muted-foreground">
-                    {selectedFeed ? selectedFeed.url : selectedCategory?.description}
-                  </p>
+                  {unreadCount > 0 && (
+                    <Badge className="text-xs bg-black text-white hover:bg-black/80">
+                      {unreadCount}
+                    </Badge>
+                  )}
                 </div>
-              )}
-            </div>
-
-            <div className="flex items-center space-x-2">
-              {(selectedFeed || selectedCategory) && (
-                <>
-                  <Button
-                    variant={filterUnread ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setFilterUnread(!filterUnread)}
-                  >
-                    <Filter className="h-4 w-4 mr-2" />
-                    {filterUnread ? "Show All" : "Unread Only"} ({unreadCount})
-                  </Button>
-                  {selectedFeed && (
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => handleOpenFeedSettings(selectedFeed)}
-                    >
-                      <Settings className="h-4 w-4" />
-                    </Button>
-                  )}
-                  {selectedCategory && (
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => handleOpenCategorySettings(selectedCategory)}
-                    >
-                      <Settings className="h-4 w-4" />
-                    </Button>
-                  )}
-                </>
-              )}
-            </div>
+                
+                {/* Right side - 3-dot menu */}
+                <div className="flex-1 flex justify-end">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0"
+                      >
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => setFilterUnread(!filterUnread)}>
+                        <Filter className="h-4 w-4 mr-2" />
+                        {filterUnread ? "Show All" : "Hide Read"}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        onClick={() => {
+                          if (selectedFeed) {
+                            handleOpenFeedSettings(selectedFeed);
+                          } else if (selectedCategory) {
+                            handleOpenCategorySettings(selectedCategory);
+                          }
+                        }}
+                      >
+                        <Edit className="h-4 w-4 mr-2" />
+                        {selectedFeed ? "Edit Feed" : "Edit Category"}
+                      </DropdownMenuItem>
+                      {selectedFeed && selectedFeed.url && (
+                        <DropdownMenuItem onClick={() => window.open(selectedFeed.url, '_blank')}>
+                          <ExternalLink className="h-4 w-4 mr-2" />
+                          Open RSS URL
+                        </DropdownMenuItem>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </>
+            ) : (
+              /* Empty state - no content selected */
+              <div className="flex-1"></div>
+            )}
           </div>
         </div>
       </header>
