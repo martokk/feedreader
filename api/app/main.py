@@ -66,7 +66,7 @@ async def api_root():
             "feeds": "/api/v1/feeds",
             "health": "/api/v1/health",
             "sse": "/api/v1/sse/events",
-            "import": "/api/v1/import/opml",
-            "export": "/api/v1/export/opml",
+            "import": "/api/v1/opml/import",
+            "export": "/api/v1/opml/export",
         },
     }

@@ -16,6 +16,7 @@ import { AddFeedDialog } from '@/components/dialogs/AddFeedDialog';
 import { CategoryDialog } from '@/components/dialogs/CategoryDialog';
 import { FeedSettingsDialog } from '@/components/dialogs/FeedSettingsDialog';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { Settings as SettingsPage } from '@/components/Settings';
 
 // Helper function to get feed title by feed_id
 const getFeedTitle = (feedId: string, feeds: Feed[]): string => {
@@ -88,6 +89,8 @@ export default function HomePage() {
   const [showFeedSettingsDialog, setShowFeedSettingsDialog] = useState(false);
   const [selectedFeedForSettings, setSelectedFeedForSettings] = useState<Feed | null>(null);
   const [selectedCategoryForEdit, setSelectedCategoryForEdit] = useState<Category | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
+  const [selectedSettingsCategory, setSelectedSettingsCategory] = useState('appearance');
 
   // Load initial data
   useEffect(() => {
@@ -306,6 +309,16 @@ export default function HomePage() {
     await loadInitialData(); // Refresh data after category edit
   };
 
+  const handleOpenSettings = () => {
+    setShowSettings(true);
+    setSelectedFeed(null);
+    setSelectedCategory(null);
+  };
+
+  const handleCloseSettings = () => {
+    setShowSettings(false);
+  };
+
   const handleOpmlImport = async (file: File) => {
     try {
       const result = await api.importOpml(file);
@@ -491,18 +504,34 @@ export default function HomePage() {
 
           {/* Main Content Header */}
           <div className="flex-1 px-6 flex items-center justify-between">
-            {(selectedFeed || selectedCategory) ? (
+            {showSettings ? (
+              /* Settings header */
+              <div className="flex-1"></div>
+            ) : (selectedFeed || selectedCategory) ? (
               <>
                 {/* Left spacer */}
                 <div className="flex-1"></div>
                 
                 {/* Centered title with unread counter */}
                 <div className="flex items-center space-x-2">
+                  {selectedCategory && (
+                    <>
+                      {/* Category color indicator */}
+                      {selectedCategory.color && (
+                        <div 
+                          className="w-3 h-3 rounded-full border"
+                          style={{ backgroundColor: selectedCategory.color }}
+                        />
+                      )}
+                      {/* Category folder icon */}
+                      <Folder className="h-4 w-4" />
+                    </>
+                  )}
                   <h2 className="text-lg font-semibold">
                     {selectedFeed ? selectedFeed.title || 'Untitled Feed' : selectedCategory?.name}
                   </h2>
                   {unreadCount > 0 && (
-                    <Badge className="text-xs bg-black text-white hover:bg-black/80">
+                    <Badge className="text-xs bg-black text-white hover:bg-black/80 dark:bg-white dark:text-black dark:hover:bg-white/80">
                       {unreadCount}
                     </Badge>
                   )}
@@ -513,9 +542,8 @@ export default function HomePage() {
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button
-                        variant="ghost"
+                        variant="outline"
                         size="sm"
-                        className="h-8 w-8 p-0"
                       >
                         <MoreVertical className="h-4 w-4" />
                       </Button>
@@ -678,7 +706,7 @@ export default function HomePage() {
                 <RefreshCw className="h-4 w-4" />
               </Button>
               <ThemeToggle />
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" onClick={handleOpenSettings}>
                 <Settings className="h-4 w-4" />
               </Button>
             </div>
@@ -687,7 +715,13 @@ export default function HomePage() {
 
         {/* Main Content */}
         <div className="flex-1">
-          {(selectedFeed || selectedCategory) ? (
+          {showSettings ? (
+            <SettingsPage
+              selectedCategory={selectedSettingsCategory}
+              onCategoryChange={setSelectedSettingsCategory}
+              onClose={handleCloseSettings}
+            />
+          ) : (selectedFeed || selectedCategory) ? (
             <div className="h-[calc(100vh-4rem)] overflow-y-auto">
                   {itemsLoading ? (
                     <div className="flex items-center justify-center h-64">

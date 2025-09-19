@@ -1,0 +1,205 @@
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import { Monitor, Moon, Sun, X } from 'lucide-react';
+import { useTheme } from 'next-themes';
+import { toast } from 'sonner';
+
+import { Button } from '@/components/ui/button';
+import { api } from '@/lib/api';
+import { UserSettings } from '@/types';
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuTrigger 
+} from '@/components/ui/dropdown-menu';
+
+interface SettingsProps {
+  selectedCategory: string;
+  onCategoryChange: (category: string) => void;
+  onClose: () => void;
+}
+
+const settingsCategories = [
+  { id: 'appearance', label: 'Appearance', icon: Monitor },
+];
+
+export function Settings({ selectedCategory, onCategoryChange, onClose }: SettingsProps) {
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  const [settings, setSettings] = useState<UserSettings | null>(null);
+
+  const loadSettings = React.useCallback(async () => {
+    try {
+      const userSettings = await api.getUserSettings();
+      setSettings(userSettings);
+      // Sync theme with loaded settings
+      if (userSettings.theme && userSettings.theme !== theme) {
+        setTheme(userSettings.theme);
+      }
+    } catch (error) {
+      console.error('Failed to load settings:', error);
+      // If no settings exist, create default ones
+      try {
+        const defaultSettings = await api.createUserSettings({ theme: theme || 'system' });
+        setSettings(defaultSettings);
+      } catch (createError) {
+        console.error('Failed to create default settings:', createError);
+        toast.error('Failed to load settings');
+      }
+    }
+  }, [theme, setTheme]);
+
+  useEffect(() => {
+    setMounted(true);
+    loadSettings();
+  }, [loadSettings]);
+
+  const handleThemeChange = async (newTheme: string) => {
+    try {
+      setTheme(newTheme);
+      
+      // Update local state immediately for better UX
+      if (settings) {
+        setSettings({ ...settings, theme: newTheme });
+      }
+      
+      // Save to database
+      const updatedSettings = await api.updateUserSettings({ theme: newTheme });
+      setSettings(updatedSettings);
+      
+      toast.success('Theme preference saved');
+    } catch (error) {
+      console.error('Failed to save theme setting:', error);
+      toast.error('Failed to save theme preference');
+      
+      // Revert theme if save failed
+      if (settings?.theme) {
+        setTheme(settings.theme);
+      }
+    }
+  };
+
+  const getThemeIcon = (themeValue: string) => {
+    switch (themeValue) {
+      case 'light': return <Sun className="h-4 w-4" />;
+      case 'dark': return <Moon className="h-4 w-4" />;
+      default: return <Monitor className="h-4 w-4" />;
+    }
+  };
+
+  const getThemeLabel = (themeValue: string) => {
+    switch (themeValue) {
+      case 'light': return 'Light';
+      case 'dark': return 'Dark';
+      default: return 'System';
+    }
+  };
+
+  const renderAppearanceSettings = () => (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-lg font-medium mb-4">Appearance</h3>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <label className="text-sm font-medium">Theme</label>
+              <p className="text-sm text-muted-foreground">
+                Choose your preferred theme
+              </p>
+            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="w-32">
+                  {mounted ? (
+                    <>
+                      {getThemeIcon(theme || 'system')}
+                      <span className="ml-2">{getThemeLabel(theme || 'system')}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Monitor className="h-4 w-4" />
+                      <span className="ml-2">System</span>
+                    </>
+                  )}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => handleThemeChange('light')}>
+                  <Sun className="h-4 w-4 mr-2" />
+                  Light
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleThemeChange('dark')}>
+                  <Moon className="h-4 w-4 mr-2" />
+                  Dark
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleThemeChange('system')}>
+                  <Monitor className="h-4 w-4 mr-2" />
+                  System
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderSettingsContent = () => {
+    switch (selectedCategory) {
+      case 'appearance':
+        return renderAppearanceSettings();
+      default:
+        return <div>Select a settings category</div>;
+    }
+  };
+
+  return (
+    <div className="h-[calc(100vh-4rem)] flex">
+      {/* Settings Sidebar */}
+      <div className="w-64 border-r bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="p-4">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-lg font-semibold">Settings</h2>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 w-8 p-0"
+              onClick={onClose}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+          
+          <nav className="space-y-1">
+            {settingsCategories.map((category) => {
+              const Icon = category.icon;
+              return (
+                <button
+                  key={category.id}
+                  onClick={() => onCategoryChange(category.id)}
+                  className={`w-full flex items-center px-3 py-2 text-sm rounded-lg transition-colors ${
+                    selectedCategory === category.id
+                      ? 'bg-accent text-accent-foreground'
+                      : 'hover:bg-accent/50'
+                  }`}
+                >
+                  <Icon className="h-4 w-4 mr-3" />
+                  {category.label}
+                </button>
+              );
+            })}
+          </nav>
+        </div>
+      </div>
+
+      {/* Settings Content */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="p-6">
+          {renderSettingsContent()}
+        </div>
+      </div>
+    </div>
+  );
+}

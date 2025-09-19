@@ -102,4 +102,20 @@ export interface SSEEvent {
 
 export interface ApiError {
   detail: string;
+}
+
+export interface UserSettings {
+  id: string;
+  user_id?: string;
+  theme: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserSettingsCreate {
+  theme?: string;
+}
+
+export interface UserSettingsUpdate {
+  theme?: string;
 } 
