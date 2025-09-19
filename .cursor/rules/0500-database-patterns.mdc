@@ -1,0 +1,103 @@
+---
+globs: api/alembic/**/*.py,api/app/models/**/*.py
+description: Database models, migrations, and async SQLAlchemy patterns
+---
+
+# Database & Migration Patterns
+
+## Schema Overview
+
+Core tables in [api/app/models/](mdc:api/app/models/):
+
+- **feeds**: RSS feed URLs and metadata
+- **items**: Individual RSS entries  
+- **read_state**: User read/starred status (single-user)
+- **fetch_log**: Fetch operation history
+
+## Model Patterns
+
+All models inherit from [api/app/models/base.py](mdc:api/app/models/base.py):
+
+```python
+from .base import Base, UUIDMixin, TimestampMixin
+
+class MyModel(Base, UUIDMixin, TimestampMixin):
+    __tablename__ = "my_table"
+    
+    # Your fields here
+    name: Mapped[str] = mapped_column(String(255))
+```
+
+### Key Conventions
+
+- Use `UUIDMixin` for UUID primary keys
+- Use `TimestampMixin` for created_at/updated_at
+- Always specify `__tablename__`
+- Use `Mapped[]` type annotations
+- Add indexes for query performance
+
+## Migration Management
+
+Migrations in [api/alembic/](mdc:api/alembic/) using Alembic:
+
+```bash
+# Create new migration
+docker compose exec api alembic revision --autogenerate -m "Add new table"
+
+# Apply migrations
+docker compose exec api alembic upgrade head
+
+# Check current version
+docker compose exec api alembic current
+```
+
+### Migration Best Practices
+
+- Always review auto-generated migrations
+- Test migrations on copy of production data
+- Use descriptive commit messages
+- Never edit existing migration files
+- Migrations run automatically on API startup
+
+## Async Database Patterns
+
+### Session Management
+
+```python
+# Always use async context manager
+async with get_db_session() as db:
+    # Query operations
+    result = await db.execute(select(Feed))
+    feeds = result.scalars().all()
+    
+    # Modifications
+    db.add(new_item)
+    await db.commit()
+```
+
+### Query Patterns
+
+```python
+# Select with filters
+stmt = select(Feed).where(Feed.last_status == 200).limit(10)
+result = await db.execute(stmt)
+feeds = result.scalars().all()
+
+# Joins with eager loading
+stmt = select(Item).options(selectinload(Item.read_state))
+result = await db.execute(stmt)
+items = result.scalars().all()
+
+# Bulk operations
+stmt = insert(Item).values(items_data)
+await db.execute(stmt)
+```
+
+## Indexes & Performance
+
+Key indexes for query performance:
+
+- `feeds.next_run_at` - scheduler queries
+- `items.published_at` - chronological ordering
+- `items.feed_id` - feed-specific queries
+- Unique constraints for data integrity

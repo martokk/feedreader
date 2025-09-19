@@ -1,0 +1,85 @@
+---
+globs: docker compose.yml,Dockerfile,*.env*
+description: Docker deployment and configuration patterns
+---
+
+# Docker & Deployment Patterns
+
+## Service Architecture
+
+The application consists of 5 Docker services defined in [docker compose.yml](mdc:docker compose.yml):
+
+### Core Services
+
+- **postgres**: PostgreSQL 16 database with health checks
+- **redis**: Redis 7 for job queue and pub/sub
+- **api**: FastAPI backend with automatic migrations
+- **worker**: RSS fetcher with scheduler + consumer
+- **frontend**: Next.js application
+
+## Configuration Management
+
+All configuration via environment variables in [.env](mdc:.env) (copy from [.env.example](mdc:.env.example)):
+
+### Critical Settings
+
+```bash
+# Database
+POSTGRES_PASSWORD=your-secure-password
+
+# Performance Tuning
+FETCH_CONCURRENCY=10        # Total concurrent fetches
+PER_HOST_CONCURRENCY=2      # Max per hostname
+UVICORN_WORKERS=2          # API workers
+
+# Content Processing
+EXTRACTION_ENGINE=trafilatura
+FETCH_DEFAULT_INTERVAL=900  # 15 minutes
+```
+
+## Service Dependencies
+
+```yaml
+# Startup order enforced by depends_on:
+postgres (healthy) → api + worker
+redis → api + worker
+api → frontend
+```
+
+## Development Workflow
+
+```bash
+# Start all services
+docker compose up -d
+
+# View logs
+docker compose logs -f [service]
+
+# Rebuild after changes
+docker compose build --no-cache [service]
+docker compose up -d [service]
+
+# Database migrations
+docker compose exec api alembic upgrade head
+```
+
+## Production Considerations
+
+1. **Reverse Proxy**: Place behind Authentik/nginx for auth and TLS
+2. **Secrets**: Use Docker secrets instead of .env for passwords
+3. **Volumes**: Backup `postgres_data` volume regularly
+4. **Monitoring**: Health checks on ports 3000 and 8000
+5. **Scaling**: Run multiple worker containers for higher throughput
+
+## Health Checks
+
+- **API**: `/api/v1/health/readiness` - checks DB + Redis
+- **Frontend**: HTTP 200 on root path
+- **Postgres**: `pg_isready` command
+- **Worker**: Process-based (no HTTP endpoint)
+
+## Network Security
+
+- Internal network (`app_net`) for service communication
+- Only frontend (3000) and API (8000) exposed to host
+- Database and Redis not accessible externally

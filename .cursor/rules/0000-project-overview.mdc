@@ -1,0 +1,47 @@
+---
+alwaysApply: true
+description: RSS Reader project overview and architecture
+---
+
+# RSS Reader - Project Overview
+
+## Architecture
+
+This is a minimal self-hosted RSS reader with the following services:
+
+- **Frontend** ([frontend/](mdc:frontend/)): Next.js + TypeScript + Tailwind CSS
+- **API** ([api/](mdc:api/)): FastAPI + SQLAlchemy + Alembic + Redis
+- **Worker** ([worker/](mdc:worker/)): Python async scheduler + consumer
+- **Database**: PostgreSQL 16 with async SQLAlchemy
+- **Queue/Cache**: Redis 7 for jobs and pub/sub
+
+## Key Entry Points
+
+- Frontend: [frontend/app/page.tsx](mdc:frontend/app/page.tsx)
+- API: [api/app/main.py](mdc:api/app/main.py)
+- Worker: [worker/reader_worker/main.py](mdc:worker/reader_worker/main.py)
+- Docker: [docker compose.yml](mdc:docker compose.yml)
+- Config: [.env.example](mdc:.env.example)
+
+## Data Flow
+
+1. User adds feed via frontend → API stores in PostgreSQL
+2. Worker scheduler queries due feeds → enqueues to Redis
+3. Worker consumer fetches RSS → parses + stores items
+4. New items trigger Redis pub/sub → SSE events to frontend
+5. Frontend receives real-time updates via Server-Sent Events
+
+## Database Schema
+
+- `feeds`: RSS feed URLs and metadata
+- `items`: Individual RSS entries
+- `read_state`: User read/starred status
+- `fetch_log`: Fetch operation history
+
+## Key Technologies
+
+- **Async everywhere**: FastAPI, SQLAlchemy async, Redis async
+- **Real-time**: Server-Sent Events for live updates
+- **Content extraction**: Trafilatura for full article content
+- **HTTP caching**: ETag/Last-Modified support
+- **Rate limiting**: Per-host concurrency controls

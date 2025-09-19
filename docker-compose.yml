@@ -1,0 +1,108 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app_net
+
+  redis:
+    image: redis:7
+    networks:
+      - app_net
+
+  api:
+    build: ./api
+    ports:
+      - "8000:8000"
+    environment:
+      POSTGRES_HOST: ${POSTGRES_HOST}
+      POSTGRES_PORT: ${POSTGRES_PORT}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      REDIS_URL: ${REDIS_URL}
+      API_HOST: ${API_HOST}
+      API_PORT: ${API_PORT}
+      UVICORN_WORKERS: ${UVICORN_WORKERS}
+      API_MAX_CONNECTIONS: ${API_MAX_CONNECTIONS}
+      SSE_HEARTBEAT_MS: ${SSE_HEARTBEAT_MS}
+      APP_ENV: ${APP_ENV}
+      LOG_LEVEL: ${LOG_LEVEL}
+      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    command: /bin/sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers ${UVICORN_WORKERS}"
+    healthcheck:
+      test:
+        ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health/liveness"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - app_net
+
+  worker:
+    build: ./worker
+    environment:
+      POSTGRES_HOST: ${POSTGRES_HOST}
+      POSTGRES_PORT: ${POSTGRES_PORT}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      REDIS_URL: ${REDIS_URL}
+      FETCH_DEFAULT_INTERVAL: ${FETCH_DEFAULT_INTERVAL}
+      FETCH_CONCURRENCY: ${FETCH_CONCURRENCY}
+      PER_HOST_CONCURRENCY: ${PER_HOST_CONCURRENCY}
+      FETCH_TIMEOUT_SECONDS: ${FETCH_TIMEOUT_SECONDS}
+      SCHEDULER_TICK_SECONDS: ${SCHEDULER_TICK_SECONDS}
+      SCHEDULER_BATCH_SIZE: ${SCHEDULER_BATCH_SIZE}
+      EXTRACTION_ENGINE: ${EXTRACTION_ENGINE}
+      APP_ENV: ${APP_ENV}
+      LOG_LEVEL: ${LOG_LEVEL}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    command: python -m reader_worker.main
+    restart: on-failure
+    networks:
+      - app_net
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+    depends_on:
+      - api
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - app_net
+
+volumes:
+  postgres_data:
+
+networks:
+  app_net:
+    driver: bridge
