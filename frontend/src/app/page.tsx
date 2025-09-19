@@ -677,7 +677,7 @@ export default function HomePage() {
                       onClick={() => setFilterUnread(!filterUnread)}
                     >
                       <Filter className="h-4 w-4 mr-2" />
-                      Unread ({unreadCount})
+                      {filterUnread ? "Show All" : "Unread Only"} ({unreadCount})
                     </Button>
                     {selectedFeed && (
                       <Button 
