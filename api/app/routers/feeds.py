@@ -4,7 +4,7 @@ from typing import List
 from urllib.parse import urlparse
 
 import feedparser
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -88,17 +88,24 @@ async def get_feed_stats(feed_id: uuid.UUID, db: AsyncSession = Depends(get_db))
 
 
 @router.post("/validate", response_model=FeedValidation)
-async def validate_feed_url(url: str):
+async def validate_feed_url(url: str = Query()):
     """Validate a feed URL and get basic feed information."""
     try:
         # Parse the feed to validate it
         parsed_feed = feedparser.parse(url)
 
         if parsed_feed.bozo:
+            # Provide user-friendly error message for parsing failures
+            error_str = str(parsed_feed.bozo_exception).lower()
+            if "syntax error" in error_str:
+                error_message = "The URL does not contain valid RSS/Atom feed content. Please check the URL and try again."
+            else:
+                error_message = "The URL does not appear to be a valid RSS/Atom feed. Please check the URL and try again."
+
             return FeedValidation(
                 url=url,
                 is_valid=False,
-                error_message=f"Feed parsing error: {parsed_feed.bozo_exception}",
+                error_message=error_message,
             )
 
         if not parsed_feed.feed:
@@ -227,7 +234,7 @@ async def update_feed(
         )
 
     # Update only the provided fields
-    update_data = feed_update.dict(exclude_unset=True)
+    update_data = feed_update.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(feed, field, value)
 

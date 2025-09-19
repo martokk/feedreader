@@ -244,23 +244,24 @@ async def get_category_items(
             status_code=status.HTTP_404_NOT_FOUND, detail="Category not found"
         )
 
-    # Build items query
+        # Build items query
     items_stmt = (
         select(Item)
         .select_from(category_feed)
         .join(Feed, category_feed.c.feed_id == Feed.id)
         .join(Item, Feed.id == Item.feed_id)
-        .outerjoin(ReadState, ReadState.item_id == Item.id)
         .where(category_feed.c.category_id == category_id)
     )
 
     # Apply filters
     if read_status == "read":
-        items_stmt = items_stmt.where(ReadState.read_at.is_not(None))
+        items_stmt = items_stmt.outerjoin(
+            ReadState, ReadState.item_id == Item.id
+        ).where(ReadState.read_at.is_not(None))
     elif read_status == "unread":
-        items_stmt = items_stmt.where(
-            or_(ReadState.read_at.is_(None), ReadState.item_id.is_(None))
-        )
+        items_stmt = items_stmt.outerjoin(
+            ReadState, ReadState.item_id == Item.id
+        ).where(or_(ReadState.read_at.is_(None), ReadState.item_id.is_(None)))
 
     if date_from:
         items_stmt = items_stmt.where(Item.published_at >= date_from)
@@ -275,10 +276,43 @@ async def get_category_items(
         .order_by(Item.published_at.desc().nulls_last(), Item.created_at.desc())
     )
 
+    # Execute query and load read_state relationships separately
     items_result = await db.execute(items_stmt)
     items = items_result.scalars().all()
 
-    return items
+    # Load read_state for all items
+    if items:
+        item_ids = [item.id for item in items]
+        read_states_stmt = select(ReadState).where(ReadState.item_id.in_(item_ids))
+        read_states_result = await db.execute(read_states_stmt)
+        read_states = read_states_result.scalars().all()
+
+        # Create a mapping of item_id to read_state
+        read_state_map = {rs.item_id: rs for rs in read_states}
+
+        # Assign read_state to items
+        for item in items:
+            item.read_state = read_state_map.get(item.id)
+
+    # Convert to response format
+    response_items = []
+    for item in items:
+        item_dict = {
+            "id": item.id,
+            "feed_id": item.feed_id,
+            "title": item.title,
+            "url": item.url,
+            "published_at": item.published_at,
+            "fetched_at": item.fetched_at,
+            "created_at": item.created_at,
+            "is_read": item.read_state.read_at is not None
+            if item.read_state
+            else False,
+            "starred": item.read_state.starred if item.read_state else False,
+        }
+        response_items.append(ItemResponse(**item_dict))
+
+    return response_items
 
 
 @router.post("/", response_model=CategoryResponse, status_code=status.HTTP_201_CREATED)

@@ -87,7 +87,7 @@ export interface CategoryStats {
 }
 
 export interface ReadStateUpdate {
-  is_read: boolean;
+  read?: boolean;
   starred?: boolean;
 }
 

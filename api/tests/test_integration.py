@@ -377,6 +377,7 @@ class TestIntegrationWorkflows:
         endpoints_to_test = [
             "/api/v1/health/liveness",
             "/api/v1/feeds/",
+            "/api/v1/categories/",  # CRITICAL: Added to prevent missing categories bug
             "/api/v1/export/opml",
             "/api/v1/sse/events",
         ]

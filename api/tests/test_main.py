@@ -24,6 +24,7 @@ class TestMainApplication:
         assert "endpoints" in data
 
         endpoints = data["endpoints"]
+        assert endpoints["categories"] == "/api/v1/categories"
         assert endpoints["feeds"] == "/api/v1/feeds"
         assert endpoints["health"] == "/api/v1/health"
         assert endpoints["sse"] == "/api/v1/sse/events"
@@ -99,6 +100,11 @@ class TestMainApplication:
 
         # Item routes (under feeds router)
         assert "/api/v1/feeds/{feed_id}/items" in routes
+
+        # Categories routes - CRITICAL: These were missing and caused the bug!
+        assert "/api/v1/categories/" in routes
+        assert "/api/v1/categories/{category_id}" in routes
+        assert "/api/v1/categories/with-stats" in routes
 
         # SSE routes
         assert "/api/v1/sse/events" in routes

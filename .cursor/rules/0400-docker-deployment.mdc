@@ -5,6 +5,10 @@ description: Docker deployment and configuration patterns
 
 # Docker & Deployment Patterns
 
+## IMPORTANT
+
+- You need to build the frontend and api before starting the services.
+
 ## Service Architecture
 
 The application consists of 5 Docker services defined in [docker compose.yml](mdc:docker compose.yml):
@@ -49,8 +53,8 @@ api → frontend
 ## Development Workflow
 
 ```bash
-# Start all services
-docker compose up -d
+# Start all services (You need to build)
+docker compose up -d --build
 
 # View logs
 docker compose logs -f [service]

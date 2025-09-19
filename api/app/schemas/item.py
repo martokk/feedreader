@@ -13,8 +13,8 @@ class ItemResponse(BaseModel):
     published_at: Optional[datetime]
     fetched_at: datetime
     created_at: datetime
-    is_read: Optional[bool] = None
-    starred: Optional[bool] = None
+    is_read: bool
+    starred: bool
 
     class Config:
         from_attributes = True
@@ -30,8 +30,8 @@ class ItemDetail(BaseModel):
     published_at: Optional[datetime]
     fetched_at: datetime
     created_at: datetime
-    is_read: Optional[bool] = None
-    starred: Optional[bool] = None
+    is_read: bool
+    starred: bool
 
     class Config:
         from_attributes = True
