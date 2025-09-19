@@ -15,6 +15,7 @@ import { Category, Feed, Item } from '@/types';
 import { AddFeedDialog } from '@/components/dialogs/AddFeedDialog';
 import { CategoryDialog } from '@/components/dialogs/CategoryDialog';
 import { FeedSettingsDialog } from '@/components/dialogs/FeedSettingsDialog';
+import { ThemeToggle } from '@/components/theme-toggle';
 
 // Helper function to get feed title by feed_id
 const getFeedTitle = (feedId: string, feeds: Feed[]): string => {
@@ -676,9 +677,7 @@ export default function HomePage() {
               <Button variant="outline" size="sm" onClick={() => loadInitialData()}>
                 <RefreshCw className="h-4 w-4" />
               </Button>
-              <Button variant="outline" size="sm">
-                Theme
-              </Button>
+              <ThemeToggle />
               <Button variant="outline" size="sm">
                 <Settings className="h-4 w-4" />
               </Button>
