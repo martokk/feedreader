@@ -7,7 +7,6 @@ import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { ScrollArea } from '@/components/ui/scroll-area';
 
 import { api } from '@/lib/api';
 import { SSEClient } from '@/lib/sse';
@@ -88,7 +87,6 @@ export default function HomePage() {
   const [showFeedSettingsDialog, setShowFeedSettingsDialog] = useState(false);
   const [selectedFeedForSettings, setSelectedFeedForSettings] = useState<Feed | null>(null);
   const [selectedCategoryForEdit, setSelectedCategoryForEdit] = useState<Category | null>(null);
-  const [showOpmlImportDialog, setShowOpmlImportDialog] = useState(false);
 
   // Load initial data
   useEffect(() => {
@@ -429,89 +427,125 @@ export default function HomePage() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="h-screen bg-background flex flex-col">
       {/* Header */}
       <header className="border-b bg-card/50 backdrop-blur supports-[backdrop-filter]:bg-card/50 sticky top-0 z-50">
-        <div className="h-16 px-6 flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2">
-              <Rss className="h-6 w-6 text-primary" />
-              <h1 className="text-xl font-bold">RSS Reader</h1>
+        <div className="h-16 flex">
+          {/* Sidebar Header */}
+          <div className="w-80 px-6 flex items-center justify-between border-r">
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2">
+                <Rss className="h-6 w-6 text-primary" />
+                <h1 className="text-xl font-bold">RSS Reader</h1>
+              </div>
+              
+              {/* Connection Status */}
+              <div className="flex items-center space-x-2">
+                <div className={`w-2 h-2 rounded-full ${
+                  connectionStatus === 'connected' ? 'bg-green-500' :
+                  connectionStatus === 'connecting' ? 'bg-yellow-500' :
+                  'bg-red-500'
+                }`} />
+                <span className="text-xs text-muted-foreground">
+                  {connectionStatus === 'connected' ? 'Live' :
+                   connectionStatus === 'connecting' ? 'Connecting...' :
+                   'Offline'}
+                </span>
+              </div>
             </div>
-            
-            {/* Connection Status */}
-            <div className="flex items-center space-x-2">
-              <div className={`w-2 h-2 rounded-full ${
-                connectionStatus === 'connected' ? 'bg-green-500' :
-                connectionStatus === 'connecting' ? 'bg-yellow-500' :
-                'bg-red-500'
-              }`} />
-              <span className="text-xs text-muted-foreground">
-                {connectionStatus === 'connected' ? 'Live' :
-                 connectionStatus === 'connecting' ? 'Connecting...' :
-                 'Offline'}
-              </span>
-            </div>
+
+            {/* Plus Button */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setShowAddFeedDialog(true)}>
+                  <Rss className="h-4 w-4 mr-2" />
+                  Add Feed
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleOpenCategoryCreation}>
+                  <FolderPlus className="h-4 w-4 mr-2" />
+                  Add Category
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => document.getElementById('opml-import')?.click()}>
+                  <Upload className="h-4 w-4 mr-2" />
+                  Import OPML
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <input
+              id="opml-import"
+              type="file"
+              accept=".opml,.xml"
+              onChange={handleFileUpload}
+              className="hidden"
+            />
           </div>
 
-          <div className="flex items-center space-x-2">
-            <Button variant="outline" size="sm" onClick={() => loadInitialData()}>
-              <RefreshCw className="h-4 w-4" />
-            </Button>
-            {/* Placeholder for Dark/Light Mode Toggle */}
-            <Button variant="outline" size="sm">
-              Theme
-            </Button>
-            {/* Placeholder for Settings */}
-            <Button variant="outline" size="sm">
-              <Settings className="h-4 w-4" />
-            </Button>
+          {/* Main Content Header */}
+          <div className="flex-1 px-6 flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              {(selectedFeed || selectedCategory) && (
+                <div>
+                  <h2 className="text-lg font-semibold">
+                    {selectedFeed ? selectedFeed.title || 'Untitled Feed' : selectedCategory?.name}
+                  </h2>
+                  <p className="text-sm text-muted-foreground">
+                    {selectedFeed ? selectedFeed.url : selectedCategory?.description}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center space-x-2">
+              {(selectedFeed || selectedCategory) && (
+                <>
+                  <Button
+                    variant={filterUnread ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setFilterUnread(!filterUnread)}
+                  >
+                    <Filter className="h-4 w-4 mr-2" />
+                    {filterUnread ? "Show All" : "Unread Only"} ({unreadCount})
+                  </Button>
+                  {selectedFeed && (
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => handleOpenFeedSettings(selectedFeed)}
+                    >
+                      <Settings className="h-4 w-4" />
+                    </Button>
+                  )}
+                  {selectedCategory && (
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => handleOpenCategorySettings(selectedCategory)}
+                    >
+                      <Settings className="h-4 w-4" />
+                    </Button>
+                  )}
+                </>
+              )}
+            </div>
           </div>
         </div>
       </header>
 
-      <div className="flex-1 flex">
+      <div className="flex h-[calc(100vh-4rem)]">
         {/* Sidebar */}
-        <div className="w-80 border-r bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-          <ScrollArea className="h-[calc(100vh-4rem)]">
+        <div className="w-80 border-r bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 relative">
+          <div className="h-[calc(100vh-4rem-4rem)] overflow-y-auto">
             <div className="p-4 space-y-2">
               {/* Feeds Section */}
               <div className="space-y-1">
-                <div className="flex items-center justify-between px-2 py-1">
-                  <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Feeds</h3>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 w-6 p-0"
-                      >
-                        <Plus className="h-3 w-3" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => setShowAddFeedDialog(true)}>
-                        <Rss className="h-4 w-4 mr-2" />
-                        Add Feed
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={handleOpenCategoryCreation}>
-                        <FolderPlus className="h-4 w-4 mr-2" />
-                        Add Category
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => document.getElementById('opml-import')?.click()}>
-                        <Upload className="h-4 w-4 mr-2" />
-                        Import OPML
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                  <input
-                    id="opml-import"
-                    type="file"
-                    accept=".opml,.xml"
-                    onChange={handleFileUpload}
-                    className="hidden"
-                  />
-                </div>
 
                 {categories.map((category) => (
                   <div key={category.id} className="space-y-1">
@@ -619,74 +653,28 @@ export default function HomePage() {
                 )}
               </div>
             </div>
-          </ScrollArea>
+          </div>
+          
+          {/* Sidebar Footer - Absolutely pinned to bottom */}
+          <div className="absolute bottom-0 left-0 right-0 border-t p-4 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+            <div className="flex items-center justify-center space-x-2">
+              <Button variant="outline" size="sm" onClick={() => loadInitialData()}>
+                <RefreshCw className="h-4 w-4" />
+              </Button>
+              <Button variant="outline" size="sm">
+                Theme
+              </Button>
+              <Button variant="outline" size="sm">
+                <Settings className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
         </div>
 
         {/* Main Content */}
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1">
           {(selectedFeed || selectedCategory) ? (
-            <>
-              {/* Content Header */}
-              <div className="border-b p-6">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h2 className="text-2xl font-bold">
-                      {selectedFeed ? selectedFeed.title || 'Untitled Feed' : selectedCategory?.name}
-                    </h2>
-                    <p className="text-muted-foreground mt-1">
-                      {selectedFeed ? selectedFeed.url : selectedCategory?.description}
-                    </p>
-                    {selectedFeed && (
-                      <div className="flex items-center gap-2 mt-2">
-                        <span className="text-sm text-muted-foreground">Status:</span>
-                        <Badge variant={selectedFeed.last_status && selectedFeed.last_status >= 200 && selectedFeed.last_status < 400 ? 'default' : 'destructive'} className="text-xs">
-                          {selectedFeed.last_status && selectedFeed.last_status >= 200 && selectedFeed.last_status < 400 ? 'OK' : 'Error'}
-                          {selectedFeed.last_status && ` (${selectedFeed.last_status})`}
-                        </Badge>
-                        {selectedFeed.last_fetch_at && (
-                          <span className="text-sm text-muted-foreground">Last fetch: {new Date(selectedFeed.last_fetch_at).toLocaleString()}</span>
-                        )}
-                      </div>
-                    )}
-                    {selectedCategory && (
-                      <p className="text-muted-foreground mt-1">
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Button
-                      variant={filterUnread ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setFilterUnread(!filterUnread)}
-                    >
-                      <Filter className="h-4 w-4 mr-2" />
-                      {filterUnread ? "Show All" : "Unread Only"} ({unreadCount})
-                    </Button>
-                    {selectedFeed && (
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => handleOpenFeedSettings(selectedFeed)}
-                      >
-                        <Settings className="h-4 w-4" />
-                      </Button>
-                    )}
-                    {selectedCategory && (
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => handleOpenCategorySettings(selectedCategory)}
-                      >
-                        <Settings className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Articles Content */}
-              <div className="flex-1 overflow-hidden">
-                <ScrollArea className="h-full">
+            <div className="h-[calc(100vh-4rem)] overflow-y-auto">
                   {itemsLoading ? (
                     <div className="flex items-center justify-center h-64">
                       <div className="text-center">
@@ -705,7 +693,7 @@ export default function HomePage() {
                     <div className="max-w-4xl mx-auto">
                       {/* Clean vertical list layout */}
                       <div className="divide-y divide-border">
-                        {filteredItems.map((item, index) => (
+                        {filteredItems.map((item) => (
                           <article
                             key={item.id}
                             className={`group cursor-pointer transition-colors hover:bg-accent/30 ${
@@ -788,11 +776,9 @@ export default function HomePage() {
                       </div>
                     </div>
                   )}
-                </ScrollArea>
-              </div>
-            </>
+            </div>
           ) : (
-            <div className="flex-1 flex items-center justify-center">
+            <div className="h-[calc(100vh-4rem)] flex items-center justify-center">
               <div className="text-center max-w-md">
                 <Rss className="h-24 w-24 mx-auto mb-6 text-muted-foreground opacity-50" />
                 <h3 className="text-2xl font-semibold mb-4">Welcome to RSS Reader</h3>
