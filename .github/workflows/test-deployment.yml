@@ -1,0 +1,127 @@
+name: Test Deployment
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test-api-deployment:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: testpassword
+          POSTGRES_DB: testdb
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.12"
+
+      - name: Install API dependencies
+        run: |
+          cd api
+          pip install -r requirements.txt
+          pip install requests  # For deployment test script
+
+      - name: Set up test environment
+        run: |
+          cd api
+          export DATABASE_URL="postgresql+asyncpg://postgres:testpassword@localhost:5432/testdb"
+          export REDIS_URL="redis://localhost:6379"
+
+      - name: Run database migrations
+        run: |
+          cd api
+          export DATABASE_URL="postgresql+asyncpg://postgres:testpassword@localhost:5432/testdb"
+          alembic upgrade head
+
+      - name: Start API server
+        run: |
+          cd api
+          export DATABASE_URL="postgresql+asyncpg://postgres:testpassword@localhost:5432/testdb"
+          export REDIS_URL="redis://localhost:6379"
+          uvicorn app.main:app --host 0.0.0.0 --port 8000 &
+          sleep 10  # Wait for server to start
+
+      - name: Run deployment verification
+        run: |
+          python api/test_deployment.py http://localhost:8000
+
+      - name: Run unit tests with coverage
+        run: |
+          cd api
+          export DATABASE_URL="postgresql+asyncpg://postgres:testpassword@localhost:5432/testdb"
+          export REDIS_URL="redis://localhost:6379"
+          python -m pytest tests/ -v --cov=app --cov-report=xml
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./api/coverage.xml
+          flags: api
+          name: api-coverage
+
+  test-docker-build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build API Docker image
+        run: |
+          cd api
+          docker build -t test-api .
+
+      - name: Build Frontend Docker image
+        run: |
+          cd frontend
+          docker build -t test-frontend .
+
+      - name: Test Docker Compose
+        run: |
+          # Test that docker-compose.yml is valid and builds
+          docker-compose config
+          docker-compose build --no-cache
+
+      - name: Run integration test with Docker
+        run: |
+          # Start services
+          docker-compose up -d
+
+          # Wait for services to be ready
+          sleep 30
+
+          # Test that all services are healthy
+          docker-compose ps
+
+          # Run deployment verification against Docker
+          pip install requests
+          python api/test_deployment.py http://localhost:8000
+
+          # Cleanup
+          docker-compose down

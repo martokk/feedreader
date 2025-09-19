@@ -1,0 +1,151 @@
+---
+description: Troubleshooting common issues and debugging techniques
+---
+
+# Troubleshooting Guide
+
+## Common Issues & Solutions
+
+### Services Not Starting
+
+```bash
+# Check service status
+docker compose ps
+
+# View service logs
+docker compose logs [service_name]
+
+# Rebuild problematic service
+docker compose build --no-cache [service_name]
+docker compose up -d [service_name]
+```
+
+### Database Connection Issues
+
+```bash
+# Check PostgreSQL health
+docker compose exec postgres pg_isready -U reader
+
+# Verify database exists
+docker compose exec postgres psql -U reader -l
+
+# Run migrations manually
+docker compose exec api alembic upgrade head
+```
+
+### Redis Connection Problems
+
+```bash
+# Test Redis connectivity
+docker compose exec redis redis-cli ping
+
+# Check Redis logs
+docker compose logs redis
+
+# Monitor Redis operations
+docker compose exec redis redis-cli monitor
+```
+
+### Worker Not Processing Feeds
+
+```bash
+# Check worker logs (might be silent if no errors)
+docker compose logs worker -f
+
+# Verify worker is running
+docker compose exec worker ps aux
+
+# Check Redis job queue
+docker compose exec redis redis-cli llen rss:jobs
+
+# Manual feed processing test
+curl -X POST "http://localhost:8000/api/v1/feeds/" \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://feeds.feedburner.com/oreilly/radar"}'
+```
+
+### SSE Events Not Working
+
+```bash
+# Test SSE endpoint directly
+curl -N http://localhost:8000/api/v1/sse/events
+
+# Check for proxy buffering issues
+# Ensure reverse proxy doesn't buffer SSE connections
+
+# Verify CORS settings
+# Check FRONTEND_ORIGIN environment variable
+```
+
+### High Memory/CPU Usage
+
+```bash
+# Monitor resource usage
+docker stats
+
+# Check configuration
+# Reduce FETCH_CONCURRENCY if too high
+# Tune UVICORN_WORKERS based on CPU cores
+# Adjust PER_HOST_CONCURRENCY to be more conservative
+```
+
+## Debugging Techniques
+
+### API Debugging
+
+```bash
+# Enable debug logging
+# Set LOG_LEVEL=debug in .env
+
+# Check API health
+curl http://localhost:8000/api/v1/health/readiness
+
+# View API documentation
+# Visit http://localhost:8000/docs
+```
+
+### Database Debugging
+
+```bash
+# Connect to database
+docker compose exec postgres psql -U reader reader
+
+# Check table contents
+SELECT COUNT(*) FROM feeds;
+SELECT COUNT(*) FROM items;
+SELECT url, last_status, last_fetch_at FROM feeds;
+```
+
+### Network Issues
+
+```bash
+# Check exposed ports
+docker compose port api 8000
+docker compose port frontend 3000
+
+# Test internal networking
+docker compose exec api curl http://redis:6379
+docker compose exec worker curl http://postgres:5432
+```
+
+## Log Analysis
+
+- **API logs**: HTTP requests, database operations, errors
+- **Worker logs**: Feed processing, fetch results, scheduler activity  
+- **Frontend logs**: Browser console for client-side issues
+- **PostgreSQL logs**: Database connection and query issues
+- **Redis logs**: Connection and operation logs
+
+## Performance Monitoring
+
+- Use `docker stats` to monitor resource usage
+- Check feed fetch success rates via API
+- Monitor Redis queue length: `LLEN rss:jobs`
+- Database query performance via logs
+
+## Recovery Procedures
+
+1. **Service restart**: `docker compose restart [service]`
+2. **Clean rebuild**: `docker compose down && docker compose up -d`
+3. **Database reset**: Remove postgres volume (loses all data!)
+4. **Redis reset**: `docker compose exec redis redis-cli FLUSHALL`

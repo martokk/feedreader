@@ -1,0 +1,78 @@
+---
+globs: frontend/**/*.{ts,tsx,js,jsx}
+description: Next.js frontend development patterns and conventions
+---
+
+# Frontend Development Patterns
+
+## File Structure
+
+- **App Router**: [frontend/app/](mdc:frontend/app/) - Next.js 14 app directory structure
+- **Components**: [frontend/components/](mdc:frontend/components/) - Reusable React components
+- **Types**: [frontend/types/](mdc:frontend/types/) - TypeScript interfaces
+- **API Client**: [frontend/lib/api.ts](mdc:frontend/lib/api.ts) - Backend communication
+- **SSE Client**: [frontend/lib/sse.ts](mdc:frontend/lib/sse.ts) - Server-Sent Events
+
+## Key Conventions
+
+### API Communication
+
+```typescript
+// Use the centralized API client
+import { api } from '../lib/api';
+
+// All API calls return typed responses
+const feeds: Feed[] = await api.getFeeds();
+const newFeed: Feed = await api.createFeed({ url: 'https://example.com/rss' });
+```
+
+### Server-Sent Events
+
+```typescript
+// Use SSEClient for real-time updates
+import { SSEClient } from '../lib/sse';
+
+const sseClient = new SSEClient(`${API_URL}/api/v1/sse/events`);
+sseClient.on('new_items', (event) => {
+  // Handle new items event
+});
+sseClient.connect();
+```
+
+### State Management
+
+- Use React hooks (useState, useEffect) for local state
+- No external state management library needed for this simple app
+- Server state is managed through API calls and SSE events
+
+### Styling
+
+- Use Tailwind CSS utility classes
+- Component-specific styles in [frontend/app/globals.css](mdc:frontend/app/globals.css)
+- Responsive design with mobile-first approach
+
+### Error Handling
+
+```typescript
+try {
+  const result = await api.createFeed(feedData);
+  // Handle success
+} catch (error) {
+  if (error instanceof APIError) {
+    // Handle API-specific errors
+    alert(`Failed: ${error.message}`);
+  }
+}
+```
+
+## Component Patterns
+
+- Use functional components with hooks
+- Extract reusable components to [frontend/components/](mdc:frontend/components/)
+- Use TypeScript interfaces from [frontend/types/](mdc:frontend/types/)
+- Handle loading and error states in UI
+
+## Environment Variables
+
+- Prefix with `NEXT_PUBLIC_` for client-side access
+- `NEXT_PUBLIC_API_URL`: Backend API base URL

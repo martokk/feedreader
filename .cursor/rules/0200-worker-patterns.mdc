@@ -1,0 +1,67 @@
+---
+globs: worker/**/*.py
+description: RSS Worker development patterns and async conventions
+---
+
+# Worker Development Patterns
+
+## Architecture
+
+The worker consists of two main components running concurrently:
+
+- **Scheduler** ([worker/reader_worker/scheduler.py](mdc:worker/reader_worker/scheduler.py)): Queries database for due feeds, enqueues jobs
+- **Consumer** ([worker/reader_worker/consumer.py](mdc:worker/reader_worker/consumer.py)): Processes fetch jobs from Redis queue
+
+## Key Components
+
+- **Fetcher** ([worker/reader_worker/fetcher.py](mdc:worker/reader_worker/fetcher.py)): HTTP client with caching and content extraction
+- **Database** ([worker/reader_worker/database.py](mdc:worker/reader_worker/database.py)): Async session management
+- **Models** ([worker/reader_worker/models.py](mdc:worker/reader_worker/models.py)): Simplified SQLAlchemy models
+
+## Async Patterns
+
+### Database Sessions
+
+```python
+# Always use async context manager
+async with get_db_session() as db:
+    # Database operations
+    await db.commit()
+```
+
+### Redis Operations
+
+```python
+# Use redis.asyncio
+import redis.asyncio as redis
+redis_conn = redis.from_url(settings.redis_url)
+await redis_conn.lpush("rss:jobs", job_data)
+```
+
+### HTTP Requests
+
+```python
+# Use httpx AsyncClient with connection limits
+async with httpx.AsyncClient(
+    timeout=httpx.Timeout(30),
+    limits=httpx.Limits(max_connections=10)
+) as client:
+    response = await client.get(url, headers=headers)
+```
+
+## Feed Processing
+
+1. **HTTP Caching**: Always send `If-Modified-Since` and `If-None-Match` headers
+2. **Rate Limiting**: Use per-host semaphores to respect server limits
+3. **Content Extraction**: Use Trafilatura for full article content
+4. **Error Handling**: Log all errors and update feed status
+5. **Pub/Sub**: Publish events to Redis for real-time UI updates
+
+## Configuration
+
+All worker settings in [worker/reader_worker/config.py](mdc:worker/reader_worker/config.py):
+
+- `FETCH_CONCURRENCY`: Total concurrent fetches
+- `PER_HOST_CONCURRENCY`: Max per hostname
+- `SCHEDULER_TICK_SECONDS`: How often to check for due feeds
+- `EXTRACTION_ENGINE`: Content extraction method

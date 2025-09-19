@@ -1,0 +1,61 @@
+---
+globs: api/**/*.py
+description: FastAPI development patterns and conventions
+---
+
+# API Development Patterns
+
+## File Structure
+
+- **Models**: [api/app/models/](mdc:api/app/models/) - SQLAlchemy models with async support
+- **Routers**: [api/app/routers/](mdc:api/app/routers/) - FastAPI route handlers
+- **Schemas**: [api/app/schemas/](mdc:api/app/schemas/) - Pydantic request/response models
+- **Core**: [api/app/core/](mdc:api/app/core/) - Database, Redis, config
+
+## Key Conventions
+
+### Database Models
+
+- Inherit from [api/app/models/base.py](mdc:api/app/models/base.py)
+- Use `UUIDMixin` for primary keys
+- Use `TimestampMixin` for created_at/updated_at
+- Always use async SQLAlchemy patterns
+
+### API Routes
+
+- Use dependency injection with `Depends(get_db)`
+- Return Pydantic models, not raw SQLAlchemy objects
+- Use proper HTTP status codes (201 for creation, 204 for deletion)
+- Handle exceptions with HTTPException
+
+### Configuration
+
+- All settings in [api/app/core/config.py](mdc:api/app/core/config.py)
+- Use pydantic-settings BaseSettings
+- Environment variables for all config
+
+### Redis Usage
+
+- Import from [api/app/core/redis.py](mdc:api/app/core/redis.py)
+- Use `redis.asyncio` not `aioredis`
+- Publish events to `RSS_EVENTS_CHANNEL` for SSE
+
+## Database Sessions
+
+```python
+# Always use async context manager
+async with get_db_session() as db:
+    # Database operations
+    await db.commit()
+```
+
+## Error Handling
+
+```python
+try:
+    # Database operations
+    await db.commit()
+except Exception as e:
+    await db.rollback()
+    raise HTTPException(status_code=500, detail=str(e))
+```
