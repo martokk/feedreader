@@ -77,6 +77,7 @@ class CategoryResponse(BaseModel):
     order: int
     created_at: datetime
     updated_at: datetime
+    unread_count: int = 0
 
     class Config:
         from_attributes = True
@@ -86,6 +87,7 @@ class CategoryWithFeeds(CategoryResponse):
     """Category response with associated feeds."""
 
     feeds: List["FeedResponse"] = []
+    unread_count: int = 0
 
     class Config:
         from_attributes = True

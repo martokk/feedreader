@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import class_mapper
 
 from ..core.database import get_db
 from ..core.redis import get_redis
@@ -34,10 +35,34 @@ async def get_feeds(
     skip: int = 0, limit: int = 100, db: AsyncSession = Depends(get_db)
 ):
     """Get all feeds."""
-    stmt = select(Feed).offset(skip).limit(limit).order_by(Feed.created_at.desc())
+    stmt = (
+        select(
+            Feed,
+            func.count(Item.id)
+            .filter(or_(ReadState.read_at.is_(None), ReadState.item_id.is_(None)))
+            .label("unread_count"),
+        )
+        .outerjoin(Item, Feed.id == Item.feed_id)
+        .outerjoin(ReadState, Item.id == ReadState.item_id)
+        .group_by(Feed.id)
+        .offset(skip)
+        .limit(limit)
+        .order_by(Feed.created_at.desc())
+    )
     result = await db.execute(stmt)
-    feeds = result.scalars().all()
-    return feeds
+    feeds_with_unread_count = result.all()
+
+    feeds_response = []
+    for feed, unread_count in feeds_with_unread_count:
+        feed_data = {
+            attr.key: getattr(feed, attr.key)
+            for attr in class_mapper(Feed).iterate_properties
+            if attr.key not in ["items", "categories", "fetch_logs"]
+        }
+        feed_data["unread_count"] = unread_count
+        feeds_response.append(FeedResponse(**feed_data))
+
+    return feeds_response
 
 
 @router.get("/{feed_id}", response_model=FeedResponse)

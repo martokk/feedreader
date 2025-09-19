@@ -5,7 +5,7 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import and_, delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import class_mapper, selectinload
 
 from ..core.database import get_db
 from ..models import Category, Feed, Item, ReadState
@@ -35,14 +35,35 @@ async def get_categories(
     """Get all categories with optional ordering."""
     order_column = getattr(Category, order_by)
     stmt = (
-        select(Category)
+        select(
+            Category,
+            func.count(Item.id)
+            .filter(or_(ReadState.read_at.is_(None), ReadState.item_id.is_(None)))
+            .label("unread_count"),
+        )
+        .outerjoin(category_feed, Category.id == category_feed.c.category_id)
+        .outerjoin(Feed, category_feed.c.feed_id == Feed.id)
+        .outerjoin(Item, Feed.id == Item.feed_id)
+        .outerjoin(ReadState, ReadState.item_id == Item.id)
+        .group_by(Category.id)
         .offset(skip)
         .limit(limit)
         .order_by(order_column.asc() if order_by == "order" else order_column.desc())
     )
     result = await db.execute(stmt)
-    categories = result.scalars().all()
-    return categories
+    categories_with_unread_count = result.all()
+
+    categories_response = []
+    for category, unread_count in categories_with_unread_count:
+        category_data = {
+            attr.key: getattr(category, attr.key)
+            for attr in class_mapper(Category).iterate_properties
+            if attr.key not in ["feeds"]
+        }
+        category_data["unread_count"] = unread_count
+        categories_response.append(CategoryResponse(**category_data))
+
+    return categories_response
 
 
 @router.get("/with-stats", response_model=List[CategoryWithStats])
@@ -209,18 +230,36 @@ async def get_category_feeds(
 
     # Get feeds in category
     feeds_stmt = (
-        select(Feed)
+        select(
+            Feed,
+            func.count(Item.id)
+            .filter(or_(ReadState.read_at.is_(None), ReadState.item_id.is_(None)))
+            .label("unread_count"),
+        )
         .select_from(category_feed)
         .join(Feed, category_feed.c.feed_id == Feed.id)
+        .outerjoin(Item, Feed.id == Item.feed_id)
+        .outerjoin(ReadState, Item.id == ReadState.item_id)
         .where(category_feed.c.category_id == category_id)
+        .group_by(Feed.id)
         .offset(skip)
         .limit(limit)
         .order_by(Feed.title.asc())
     )
     feeds_result = await db.execute(feeds_stmt)
-    feeds = feeds_result.scalars().all()
+    feeds_with_unread_count = feeds_result.all()
 
-    return feeds
+    feeds_response = []
+    for feed, unread_count in feeds_with_unread_count:
+        feed_data = {
+            attr.key: getattr(feed, attr.key)
+            for attr in class_mapper(Feed).iterate_properties
+            if attr.key not in ["items", "categories", "fetch_logs"]
+        }
+        feed_data["unread_count"] = unread_count
+        feeds_response.append(FeedResponse(**feed_data))
+
+    return feeds_response
 
 
 @router.get("/{category_id}/items", response_model=List[ItemResponse])
