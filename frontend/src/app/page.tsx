@@ -982,7 +982,7 @@ function HomePageContent() {
                       </div>
                     </div>
                   ) : (
-                    <div className="max-w-4xl mx-auto">
+                    <div className="max-w-feed mx-auto">
                       {/* Clean vertical list layout */}
                       <div className="divide-y divide-border">
                         {filteredItems.map((item) => (
