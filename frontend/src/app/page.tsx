@@ -1025,8 +1025,8 @@ function HomePageContent() {
                                 
                                 <div className="flex-1 min-w-0 flex justify-between">
                                   <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2 mb-1">
-                                      <h3 className={`text-base font-normal leading-relaxed line-clamp-2 ${
+                                    <div className="flex items-start gap-2 mb-1">
+                                      <h3 className={`text-base font-normal leading-relaxed line-clamp-2 flex-1 min-w-0 ${
                                         item.is_read ? 'text-muted-foreground/70' : 'text-foreground hover:text-primary transition-colors'
                                       }`}>
                                         {item.title || 'Untitled'}
@@ -1036,7 +1036,7 @@ function HomePageContent() {
                                           href={item.url}
                                           target="_blank"
                                           rel="noopener noreferrer"
-                                          className={`text-muted-foreground hover:text-primary transition-colors flex-shrink-0 ${
+                                          className={`text-muted-foreground hover:text-primary transition-colors flex-shrink-0 mt-0.5 ${
                                             item.is_read ? 'opacity-60' : ''
                                           }`}
                                           onClick={(e) => e.stopPropagation()}
