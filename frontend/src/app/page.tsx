@@ -1,6 +1,6 @@
 'use client';
 
-import { AlertTriangle, ChevronDown, ChevronRight, Edit, ExternalLink, Eye, EyeOff, Filter, Folder, FolderPlus, MoreVertical, Plus, RefreshCw, Rss, Settings, Upload } from 'lucide-react';
+import { AlertTriangle, ChevronDown, ChevronRight, Edit, ExternalLink, Eye, EyeOff, Filter, Folder, FolderPlus, MoreVertical, Plus, RefreshCw, Rss, Settings, Upload, X } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -17,6 +17,7 @@ import { AddFeedDialog } from '@/components/dialogs/AddFeedDialog';
 import { CategoryDialog } from '@/components/dialogs/CategoryDialog';
 import { FeedSettingsDialog } from '@/components/dialogs/FeedSettingsDialog';
 import FeedItemActionTray from '@/components/feed/FeedItemActionTray';
+import { ReaderView } from '@/components/ReaderView';
 import { Settings as SettingsPage } from '@/components/Settings';
 import { ThemeToggle } from '@/components/theme-toggle';
 
@@ -108,6 +109,10 @@ function HomePageContent() {
   const [showSettings, setShowSettings] = useState(false);
   const [selectedSettingsCategory, setSelectedSettingsCategory] = useState('behavior');
   const [userSettings, setUserSettings] = useState<UserSettings | null>(null);
+
+  // Reader view state
+  const [showReaderView, setShowReaderView] = useState(false);
+  const [selectedItemForReader, setSelectedItemForReader] = useState<string | null>(null);
 
   // Track initially read items (loaded as read) vs newly read items (marked read during session)
   const [initiallyReadItems, setInitiallyReadItems] = useState<Set<string>>(new Set());
@@ -345,6 +350,11 @@ function HomePageContent() {
   }, [filterUnread, userSettings?.hide_read_items]);
 
   const handleFeedSelect = (feed: Feed) => {
+    // Close reader view if open
+    if (showReaderView) {
+      setShowReaderView(false);
+      setSelectedItemForReader(null);
+    }
     setSelectedFeed(feed);
     setSelectedCategory(null);
     updateUrlParams(feed.id);
@@ -352,6 +362,11 @@ function HomePageContent() {
   };
 
   const handleCategorySelect = (category: Category) => {
+    // Close reader view if open
+    if (showReaderView) {
+      setShowReaderView(false);
+      setSelectedItemForReader(null);
+    }
     setSelectedCategory(category);
     setSelectedFeed(null);
     updateUrlParams(undefined, category.id);
@@ -371,7 +386,7 @@ function HomePageContent() {
   const handleMarkAsRead = async (item: Item) => {
     try {
       await api.markItemRead(item.id, !item.is_read);
-      setItems(prev => prev.map(i => 
+      setItems(prev => prev.map(i =>
         i.id === item.id ? { ...i, is_read: !item.is_read } : i
       ));
       toast.success(item.is_read ? 'Marked as unread' : 'Marked as read');
@@ -379,6 +394,22 @@ function HomePageContent() {
       console.error('Failed to update read status:', error);
       toast.error('Failed to update item');
     }
+  };
+
+  const handleOpenReader = (itemId: string) => {
+    setSelectedItemForReader(itemId);
+    setShowReaderView(true);
+  };
+
+  const handleCloseReader = () => {
+    setShowReaderView(false);
+    setSelectedItemForReader(null);
+  };
+
+  const handleReaderMarkAsRead = (itemId: string, isRead: boolean) => {
+    setItems(prev => prev.map(i =>
+      i.id === itemId ? { ...i, is_read: isRead } : i
+    ));
   };
 
   const markItemAsRead = useCallback(async (itemId: string) => {
@@ -749,6 +780,28 @@ function HomePageContent() {
                 {/* Right spacer */}
                 <div className="flex-1"></div>
               </>
+            ) : showReaderView ? (
+              <>
+                {/* Left spacer */}
+                <div className="flex-1"></div>
+
+                {/* Centered title */}
+                <div className="flex items-center space-x-2">
+                  <h2 className="text-lg font-semibold">Reader View</h2>
+                </div>
+
+                {/* Right side - Close button */}
+                <div className="flex-1 flex justify-end">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleCloseReader}
+                  >
+                    <X className="h-4 w-4 mr-2" />
+                    Close
+                  </Button>
+                </div>
+              </>
             ) : (selectedFeed || selectedCategory) ? (
               <>
                 {/* Left spacer */}
@@ -1009,6 +1062,13 @@ function HomePageContent() {
               onClose={handleCloseSettings}
               onSettingsChanged={handleSettingsChanged}
             />
+          ) : showReaderView && selectedItemForReader ? (
+            <ReaderView
+              itemId={selectedItemForReader}
+              feeds={feeds}
+              onClose={handleCloseReader}
+              onMarkAsRead={handleReaderMarkAsRead}
+            />
           ) : (selectedFeed || selectedCategory) ? (
             <div className="h-[calc(100vh-4rem)] overflow-y-auto">
                   {filteredItems.length === 0 ? (
@@ -1030,7 +1090,7 @@ function HomePageContent() {
                             className={`group relative cursor-pointer transition-colors hover:bg-accent/30 ${
                               item.is_read ? 'opacity-50' : ''
                             }`}
-                            onClick={() => handleMarkAsRead(item)}
+                            onClick={() => handleOpenReader(item.id)}
                           >
                             <div className="px-6 py-5 relative">
                               <div className="flex items-stretch gap-4 min-h-[6rem]">

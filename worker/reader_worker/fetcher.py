@@ -49,9 +49,10 @@ class ContentExtractor:
             html_content = trafilatura.extract(
                 html,
                 url=url,
-                output_format="xml",
+                output_format="html",
                 include_formatting=True,
                 include_links=True,
+                include_images=True,
             )
 
             return html_content, text_content
@@ -279,7 +280,7 @@ class FeedFetcher:
 
                 # Extract image URL from entry
                 image_url = None
-                
+
                 # Try media:thumbnail first (common in RSS 2.0)
                 if hasattr(entry, "media_thumbnail") and entry.media_thumbnail:
                     image_url = entry.media_thumbnail[0].get("url")
@@ -301,14 +302,17 @@ class FeedFetcher:
                         if media.get("type", "").startswith("image/"):
                             image_url = media.get("url")
                             break
-                
+
                 # Fallback: look for images in content
                 if not image_url and content_html:
                     import re
-                    img_match = re.search(r'<img[^>]+src=["\']([^"\']+)["\']', content_html, re.IGNORECASE)
+
+                    img_match = re.search(
+                        r'<img[^>]+src=["\']([^"\']+)["\']', content_html, re.IGNORECASE
+                    )
                     if img_match:
                         image_url = img_match.group(1)
-                
+
                 # Ensure image URL is valid and truncate if too long
                 if image_url and len(image_url) > 2048:
                     image_url = image_url[:2048]
