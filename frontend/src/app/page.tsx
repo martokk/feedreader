@@ -101,7 +101,7 @@ export default function HomePage() {
   const [selectedFeedForSettings, setSelectedFeedForSettings] = useState<Feed | null>(null);
   const [selectedCategoryForEdit, setSelectedCategoryForEdit] = useState<Category | null>(null);
   const [showSettings, setShowSettings] = useState(false);
-  const [selectedSettingsCategory, setSelectedSettingsCategory] = useState('appearance');
+  const [selectedSettingsCategory, setSelectedSettingsCategory] = useState('behavior');
   const [userSettings, setUserSettings] = useState<UserSettings | null>(null);
   
   // Refs for scroll detection

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Monitor, Moon, Sun, X } from 'lucide-react';
+import { Monitor, Moon, Sun, X, Settings as SettingsIcon } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { toast } from 'sonner';
 
@@ -24,6 +24,7 @@ interface SettingsProps {
 
 const settingsCategories = [
   { id: 'appearance', label: 'Appearance', icon: Monitor },
+  { id: 'behavior', label: 'Behavior', icon: SettingsIcon },
 ];
 
 export function Settings({ selectedCategory, onCategoryChange, onClose }: SettingsProps) {
@@ -165,6 +166,16 @@ export function Settings({ selectedCategory, onCategoryChange, onClose }: Settin
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderBehaviorSettings = () => (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-lg font-medium mb-4">Behavior</h3>
+        <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
               <label className="text-sm font-medium">Mark Read on Scroll</label>
@@ -186,6 +197,8 @@ export function Settings({ selectedCategory, onCategoryChange, onClose }: Settin
     switch (selectedCategory) {
       case 'appearance':
         return renderAppearanceSettings();
+      case 'behavior':
+        return renderBehaviorSettings();
       default:
         return <div>Select a settings category</div>;
     }
