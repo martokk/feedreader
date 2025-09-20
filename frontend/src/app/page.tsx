@@ -107,7 +107,10 @@ function HomePageContent() {
   const [showSettings, setShowSettings] = useState(false);
   const [selectedSettingsCategory, setSelectedSettingsCategory] = useState('behavior');
   const [userSettings, setUserSettings] = useState<UserSettings | null>(null);
-  
+
+  // Track initially read items (loaded as read) vs newly read items (marked read during session)
+  const [initiallyReadItems, setInitiallyReadItems] = useState<Set<string>>(new Set());
+
   // Refs for scroll detection
   const itemRefs = useRef<Map<string, HTMLElement>>(new Map());
   const observerRef = useRef<IntersectionObserver | null>(null);
@@ -211,9 +214,10 @@ function HomePageContent() {
       console.error('Failed to load user settings:', error);
       // Create default settings if none exist
       try {
-        const defaultSettings = await api.createUserSettings({ 
+        const defaultSettings = await api.createUserSettings({
           theme: 'system',
-          mark_read_on_scroll: true
+          mark_read_on_scroll: true,
+          hide_read_items: false
         });
         setUserSettings(defaultSettings);
       } catch (createError) {
@@ -270,6 +274,15 @@ function HomePageContent() {
         unread_only: shouldFilterUnread
       });
       setItems(itemsData);
+
+      // Track which items were initially read when loaded
+      const initiallyRead = new Set<string>();
+      itemsData.forEach(item => {
+        if (item.is_read) {
+          initiallyRead.add(item.id);
+        }
+      });
+      setInitiallyReadItems(initiallyRead);
     } catch (error) {
       console.error('Failed to load feed items:', error);
       toast.error('Failed to load items');
@@ -291,6 +304,15 @@ function HomePageContent() {
         read_status: shouldFilterUnread ? 'unread' : undefined
       });
       setItems(itemsData);
+
+      // Track which items were initially read when loaded
+      const initiallyRead = new Set<string>();
+      itemsData.forEach(item => {
+        if (item.is_read) {
+          initiallyRead.add(item.id);
+        }
+      });
+      setInitiallyReadItems(initiallyRead);
     } catch (error) {
       console.error('Failed to load category items:', error);
       toast.error('Failed to load items');
@@ -341,9 +363,10 @@ function HomePageContent() {
   const markItemAsRead = useCallback(async (itemId: string) => {
     try {
       await api.markItemRead(itemId, true);
-      setItems(prev => prev.map(i => 
+      setItems(prev => prev.map(i =>
         i.id === itemId ? { ...i, is_read: true } : i
       ));
+      // Don't add to initiallyReadItems since this was marked during the session
     } catch (error) {
       console.error('Failed to mark item as read:', error);
     }
@@ -366,15 +389,21 @@ function HomePageContent() {
           if (!item || item.is_read) return;
 
           // If item is no longer intersecting (scrolled out of view), mark as read
-          if (!entry.isIntersecting && entry.boundingClientRect.top < 0) {
-            markItemAsRead(itemId);
+          // Check if it's scrolled up (top < 0) or down (bottom below viewport)
+          if (!entry.isIntersecting) {
+            const rect = entry.boundingClientRect;
+
+            // Item has scrolled past the top or bottom of viewport
+            if (rect.top < 0 || rect.bottom < 0) {
+              markItemAsRead(itemId);
+            }
           }
         });
       },
       {
         root: null, // viewport
-        rootMargin: '0px',
-        threshold: 0
+        rootMargin: '100px 0px 100px 0px', // Extra margin to trigger earlier
+        threshold: [0, 0.1, 0.5, 1] // Multiple thresholds for better detection
       }
     );
 
@@ -408,6 +437,14 @@ function HomePageContent() {
   }, [userSettings?.mark_read_on_scroll]);
 
   const filteredItems = items.filter(item => {
+    // New "Hide Read" behavior:
+    // - If hide_read_items setting is enabled, only hide items that were initially read
+    // - Items marked as read during this session should remain visible (just dimmed)
+    if (userSettings?.hide_read_items && item.is_read && initiallyReadItems.has(item.id)) {
+      return false;
+    }
+
+    // Legacy filterUnread behavior (for the dropdown menu)
     if (filterUnread && item.is_read) return false;
     return true;
   });
@@ -483,6 +520,8 @@ function HomePageContent() {
 
   const handleCloseSettings = () => {
     setShowSettings(false);
+    // Reload user settings to pick up any changes made in settings
+    loadUserSettings();
     // Restore state from URL when closing settings
     restoreStateFromUrl();
   };
@@ -1058,6 +1097,13 @@ function HomePageContent() {
                           </article>
                         ))}
                       </div>
+
+                      {/* Extra scroll space when Mark Read On Scroll is enabled */}
+                      {userSettings?.mark_read_on_scroll && filteredItems.length > 0 && (
+                        <div className="h-screen flex items-center justify-center text-muted-foreground/30 text-sm">
+                          Scroll past to mark all items as read
+                        </div>
+                      )}
                     </div>
                   )}
             </div>

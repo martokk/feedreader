@@ -89,19 +89,42 @@ export function Settings({ selectedCategory, onCategoryChange, onClose }: Settin
       if (settings) {
         setSettings({ ...settings, mark_read_on_scroll: enabled });
       }
-      
+
       // Save to database
       const updatedSettings = await api.updateUserSettings({ mark_read_on_scroll: enabled });
       setSettings(updatedSettings);
-      
+
       toast.success('Mark read on scroll preference saved');
     } catch (error) {
       console.error('Failed to save mark read on scroll setting:', error);
       toast.error('Failed to save preference');
-      
+
       // Revert setting if save failed
       if (settings?.mark_read_on_scroll !== undefined) {
         setSettings({ ...settings, mark_read_on_scroll: !enabled });
+      }
+    }
+  };
+
+  const handleHideReadItemsChange = async (enabled: boolean) => {
+    try {
+      // Update local state immediately for better UX
+      if (settings) {
+        setSettings({ ...settings, hide_read_items: enabled });
+      }
+
+      // Save to database
+      const updatedSettings = await api.updateUserSettings({ hide_read_items: enabled });
+      setSettings(updatedSettings);
+
+      toast.success('Hide read items preference saved');
+    } catch (error) {
+      console.error('Failed to save hide read items setting:', error);
+      toast.error('Failed to save preference');
+
+      // Revert setting if save failed
+      if (settings?.hide_read_items !== undefined) {
+        setSettings({ ...settings, hide_read_items: !enabled });
       }
     }
   };
@@ -186,6 +209,18 @@ export function Settings({ selectedCategory, onCategoryChange, onClose }: Settin
             <Switch
               checked={settings?.mark_read_on_scroll ?? true}
               onCheckedChange={handleMarkReadOnScrollChange}
+            />
+          </div>
+          <div className="flex items-center justify-between">
+            <div>
+              <label className="text-sm font-medium">Hide Read Items</label>
+              <p className="text-sm text-muted-foreground">
+                Hide items that were already read when loading. Items marked as read during browsing remain visible (dimmed).
+              </p>
+            </div>
+            <Switch
+              checked={settings?.hide_read_items ?? false}
+              onCheckedChange={handleHideReadItemsChange}
             />
           </div>
         </div>

@@ -113,6 +113,7 @@ export interface UserSettings {
   user_id?: string;
   theme: string;
   mark_read_on_scroll?: boolean;
+  hide_read_items?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -120,9 +121,11 @@ export interface UserSettings {
 export interface UserSettingsCreate {
   theme?: string;
   mark_read_on_scroll?: boolean;
+  hide_read_items?: boolean;
 }
 
 export interface UserSettingsUpdate {
   theme?: string;
   mark_read_on_scroll?: boolean;
+  hide_read_items?: boolean;
 } 
