@@ -202,7 +202,7 @@ export function ReaderView({ itemId, feeds, onClose, onMarkAsRead }: ReaderViewP
           </div>
 
           {/* Article Content */}
-          <div className="prose max-w-none">
+          <div className="max-w-none article-content">
             {item.content_html ? (
               <div dangerouslySetInnerHTML={{ __html: item.content_html }} />
             ) : item.content_text ? (
