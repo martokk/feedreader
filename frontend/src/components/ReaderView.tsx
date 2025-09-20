@@ -253,8 +253,11 @@ export function ReaderView({ itemId, feeds, onClose, onMarkAsRead }: ReaderViewP
 
           {/* End of Article Actions */}
           <div className="mt-12 pt-8 border-t border-border">
-            <div className="flex flex-col items-center gap-4">
-              {/* Second Action Tray */}
+            <div className="flex justify-between items-start mb-4">
+              {/* Empty space for left side */}
+              <div></div>
+
+              {/* Action Tray on the right */}
               <div className="flex items-center gap-1 rounded-md border bg-background px-1.5 py-1">
                 {item.url && (
                   <a
@@ -277,8 +280,10 @@ export function ReaderView({ itemId, feeds, onClose, onMarkAsRead }: ReaderViewP
                   {item.is_read ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                 </button>
               </div>
+            </div>
 
-              {/* Back Button */}
+            {/* Back Button centered */}
+            <div className="flex justify-center">
               <Button
                 variant="outline"
                 onClick={onClose}

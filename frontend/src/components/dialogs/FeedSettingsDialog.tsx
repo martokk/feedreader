@@ -17,6 +17,7 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 
 import { api } from '@/lib/api';
+import { SSEClient } from '@/lib/sse';
 import { Category, Feed } from '@/types';
 
 import { ConfirmDialog } from './ConfirmDialog';
@@ -28,6 +29,7 @@ interface FeedSettingsDialogProps {
   categories: Category[];
   onFeedUpdated?: (feed: Feed) => void;
   onFeedDeleted: (feedId: string) => void;
+  sseClient?: SSEClient | null;
 }
 
 export function FeedSettingsDialog({
@@ -37,6 +39,7 @@ export function FeedSettingsDialog({
   categories,
   onFeedUpdated,
   onFeedDeleted,
+  sseClient,
 }: FeedSettingsDialogProps) {
   const [title, setTitle] = useState('');
   const [intervalSeconds, setIntervalSeconds] = useState(900);
@@ -106,15 +109,54 @@ export function FeedSettingsDialog({
   const handleRefresh = async () => {
     if (!feed) return;
 
+    // Set up completion listener if SSE client is available
+    const completionListener = (event: { data: Record<string, unknown> }) => {
+      const { feed_id, count } = event.data as { feed_id: string; count: number };
+      if (feed_id === feed.id) {
+        toast.success(`Feed refresh completed! ${count} items found.`);
+        setIsRefreshing(false);
+        // Clean up listener
+        sseClient?.off('new_items', completionListener);
+      }
+    };
+
+    const errorListener = (event: { data: Record<string, unknown> }) => {
+      const { feed_id, message } = event.data as { feed_id: string; message: string };
+      if (feed_id === feed.id) {
+        toast.error(`Feed refresh failed: ${message}`);
+        setIsRefreshing(false);
+        // Clean up listeners
+        sseClient?.off('new_items', completionListener);
+        sseClient?.off('fetch_status', errorListener);
+      }
+    };
+
     try {
       setIsRefreshing(true);
+
+      // Set up SSE listeners for completion
+      if (sseClient) {
+        sseClient.on('new_items', completionListener);
+        sseClient.on('fetch_status', errorListener);
+      }
+
       await api.refreshFeed(feed.id);
       toast.success('Feed refresh initiated');
+
+      // If no SSE client, just reset the loading state after a delay
+      if (!sseClient) {
+        setTimeout(() => setIsRefreshing(false), 3000);
+      }
     } catch (error) {
       console.error('Failed to refresh feed:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to refresh feed');
-    } finally {
       setIsRefreshing(false);
+
+      // Clean up listeners on error
+      if (sseClient) {
+        sseClient.off('new_items', completionListener);
+        sseClient.off('fetch_status', errorListener);
+      }
     }
   };
 

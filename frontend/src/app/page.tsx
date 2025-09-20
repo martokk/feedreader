@@ -1258,6 +1258,7 @@ function HomePageContent() {
         categories={categories}
         onFeedUpdated={handleFeedUpdated}
         onFeedDeleted={handleFeedDeleted}
+        sseClient={sseClient}
       />
 
       <CategoryDialog
