@@ -1,6 +1,6 @@
 'use client';
 
-import { ExternalLink, Eye, EyeOff } from 'lucide-react';
+import { ArrowLeft, ExternalLink, Eye, EyeOff } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -22,6 +22,19 @@ interface ReaderViewProps {
 const getFeedTitle = (feedId: string, feeds: Feed[]): string => {
   const feed = feeds.find(f => f.id === feedId);
   return feed?.title || 'Unknown Feed';
+};
+
+// Helper function to get feed homepage URL from feed URL
+const getFeedHomepage = (feedId: string, feeds: Feed[]): string | null => {
+  const feed = feeds.find(f => f.id === feedId);
+  if (!feed?.url) return null;
+
+  try {
+    const url = new URL(feed.url);
+    return `${url.protocol}//${url.hostname}`;
+  } catch {
+    return null;
+  }
 };
 
 // Helper function to format relative time
@@ -139,9 +152,22 @@ export function ReaderView({ itemId, feeds, onClose, onMarkAsRead }: ReaderViewP
           <div className="mb-8">
             {/* Title with Action Tray */}
             <div className="relative group mb-4">
-              <h1 className="text-3xl font-bold leading-tight pr-20">
-                {item.title || 'Untitled Article'}
-              </h1>
+              {item.url ? (
+                <h1 className="text-3xl font-bold leading-tight pr-20">
+                  <a
+                    href={item.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-primary transition-colors"
+                  >
+                    {item.title || 'Untitled Article'}
+                  </a>
+                </h1>
+              ) : (
+                <h1 className="text-3xl font-bold leading-tight pr-20">
+                  {item.title || 'Untitled Article'}
+                </h1>
+              )}
               <FeedItemActionTray placement="top-right" className="opacity-100 pointer-events-auto translate-y-0 md:opacity-100 md:pointer-events-auto md:translate-y-0">
                 {item.url && (
                   <a
@@ -168,9 +194,20 @@ export function ReaderView({ itemId, feeds, onClose, onMarkAsRead }: ReaderViewP
 
             {/* Metadata */}
             <div className="flex items-center gap-4 text-sm text-muted-foreground mb-6">
-              <span className="font-medium">
-                {getFeedTitle(item.feed_id, feeds)}
-              </span>
+              {getFeedHomepage(item.feed_id, feeds) ? (
+                <a
+                  href={getFeedHomepage(item.feed_id, feeds)!}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium hover:text-primary transition-colors"
+                >
+                  {getFeedTitle(item.feed_id, feeds)}
+                </a>
+              ) : (
+                <span className="font-medium">
+                  {getFeedTitle(item.feed_id, feeds)}
+                </span>
+              )}
               {item.published_at && (
                 <>
                   <span>•</span>
@@ -212,6 +249,45 @@ export function ReaderView({ itemId, feeds, onClose, onMarkAsRead }: ReaderViewP
                 No content available for this article.
               </p>
             )}
+          </div>
+
+          {/* End of Article Actions */}
+          <div className="mt-12 pt-8 border-t border-border">
+            <div className="flex flex-col items-center gap-4">
+              {/* Second Action Tray */}
+              <div className="flex items-center gap-1 rounded-md border bg-background px-1.5 py-1">
+                {item.url && (
+                  <a
+                    href={item.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-muted-foreground hover:text-primary transition-colors p-1 rounded hover:bg-accent/50"
+                    aria-label="Open original article"
+                    title="Open original article"
+                  >
+                    <ExternalLink className="h-5 w-5" />
+                  </a>
+                )}
+                <button
+                  className="text-muted-foreground hover:text-primary transition-colors p-1 rounded hover:bg-accent/50"
+                  onClick={handleMarkAsRead}
+                  aria-label={item.is_read ? 'Mark as unread' : 'Mark as read'}
+                  title={item.is_read ? 'Mark as unread' : 'Mark as read'}
+                >
+                  {item.is_read ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </button>
+              </div>
+
+              {/* Back Button */}
+              <Button
+                variant="outline"
+                onClick={onClose}
+                className="flex items-center gap-2"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Back
+              </Button>
+            </div>
           </div>
 
           {/* Footer spacing */}
