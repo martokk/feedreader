@@ -313,12 +313,7 @@ export default function HomePage() {
                     <CardTitle>Articles ({filteredItems.length})</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    {itemsLoading ? (
-                      <div className="text-center py-8">
-                        <RefreshCw className="h-6 w-6 animate-spin mx-auto mb-2" />
-                        <p className="text-muted-foreground">Loading articles...</p>
-                      </div>
-                    ) : filteredItems.length === 0 ? (
+                    {filteredItems.length === 0 ? (
                       <div className="text-center py-8 text-muted-foreground">
                         <Rss className="h-12 w-12 mx-auto mb-4 opacity-50" />
                         <p>No articles found</p>

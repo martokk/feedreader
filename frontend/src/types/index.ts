@@ -4,6 +4,7 @@ export interface Feed {
   title: string | null;
   last_fetch_at: string | null;
   last_status: number | null;
+  last_error?: string | null;
   next_run_at: string;
   interval_seconds: number;
   created_at: string;
@@ -28,6 +29,7 @@ export interface FeedStats {
   unread_items: number;
   last_fetch_at: string | null;
   last_fetch_status: number | null;
+  last_error?: string | null;
   next_run_at: string;
 }
 
@@ -43,6 +45,7 @@ export interface Item {
   feed_id: string;
   title: string | null;
   url: string | null;
+  image_url: string | null;
   content_text: string | null;
   published_at: string | null;
   fetched_at: string;
@@ -52,6 +55,7 @@ export interface Item {
 }
 
 export interface ItemDetail extends Item {
+  image_url: string | null;
   content_html: string | null;
   content_text: string | null;
 }
@@ -102,4 +106,26 @@ export interface SSEEvent {
 
 export interface ApiError {
   detail: string;
+}
+
+export interface UserSettings {
+  id: string;
+  user_id?: string;
+  theme: string;
+  mark_read_on_scroll?: boolean;
+  hide_read_items?: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserSettingsCreate {
+  theme?: string;
+  mark_read_on_scroll?: boolean;
+  hide_read_items?: boolean;
+}
+
+export interface UserSettingsUpdate {
+  theme?: string;
+  mark_read_on_scroll?: boolean;
+  hide_read_items?: boolean;
 } 

@@ -341,6 +341,7 @@ async def get_category_items(
             "feed_id": item.feed_id,
             "title": item.title,
             "url": item.url,
+            "image_url": item.image_url,
             "content_text": item.content_text,
             "published_at": item.published_at,
             "fetched_at": item.fetched_at,

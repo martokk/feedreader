@@ -12,7 +12,7 @@ from sqlalchemy.orm import class_mapper
 
 from ..core.database import get_db
 from ..core.redis import get_redis
-from ..models import Feed, Item, ReadState
+from ..models import Feed, FetchLog, Item, ReadState
 from ..schemas.feed import (
     FeedCreate,
     FeedResponse,
@@ -22,6 +22,20 @@ from ..schemas.feed import (
 )
 
 router = APIRouter(prefix="/feeds", tags=["feeds"])
+
+
+async def get_latest_feed_error(feed_id: uuid.UUID, db: AsyncSession) -> str | None:
+    """Get the latest error message for a feed from FetchLog."""
+    stmt = (
+        select(FetchLog.error)
+        .where(FetchLog.feed_id == feed_id)
+        .where(FetchLog.error.is_not(None))
+        .order_by(FetchLog.fetched_at.desc())
+        .limit(1)
+    )
+    result = await db.execute(stmt)
+    error = result.scalar_one_or_none()
+    return error
 
 
 class FeedCategoriesUpdate(BaseModel):
@@ -60,6 +74,8 @@ async def get_feeds(
             if attr.key not in ["items", "categories", "fetch_logs"]
         }
         feed_data["unread_count"] = unread_count
+        # Get latest error for this feed
+        feed_data["last_error"] = await get_latest_feed_error(feed.id, db)
         feeds_response.append(FeedResponse(**feed_data))
 
     return feeds_response
@@ -77,7 +93,16 @@ async def get_feed(feed_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
             status_code=status.HTTP_404_NOT_FOUND, detail="Feed not found"
         )
 
-    return feed
+    # Create feed data with latest error
+    feed_data = {
+        attr.key: getattr(feed, attr.key)
+        for attr in class_mapper(Feed).iterate_properties
+        if attr.key not in ["items", "categories", "fetch_logs"]
+    }
+    feed_data["last_error"] = await get_latest_feed_error(feed.id, db)
+    feed_data["unread_count"] = 0  # Default value for single feed response
+    
+    return FeedResponse(**feed_data)
 
 
 @router.get("/{feed_id}/stats", response_model=FeedStats)
@@ -109,12 +134,16 @@ async def get_feed_stats(feed_id: uuid.UUID, db: AsyncSession = Depends(get_db))
     unread_items_result = await db.execute(unread_items_stmt)
     unread_items = unread_items_result.scalar() or 0
 
+    # Get latest error
+    latest_error = await get_latest_feed_error(feed_id, db)
+
     return FeedStats(
         feed_id=feed_id,
         total_items=total_items,
         unread_items=unread_items,
         last_fetch_at=feed.last_fetch_at,
         last_fetch_status=feed.last_status,
+        last_error=latest_error,
         next_run_at=feed.next_run_at,
     )
 

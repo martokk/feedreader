@@ -2,7 +2,19 @@
   "permissions": {
     "allow": [
       "Bash(npm run build:*)",
-      "Bash(npm run lint)"
+      "Bash(npm run lint)",
+      "Bash(npm install:*)",
+      "Bash(python:*)",
+      "Bash(curl:*)",
+      "Bash(docker compose restart:*)",
+      "Bash(docker compose logs:*)",
+      "Bash(docker compose:*)",
+      "Bash(alembic revision:*)",
+      "Bash(docker cp:*)",
+      "Bash(rm:*)",
+      "Bash(npm run dev:*)",
+      "Bash(docker stop:*)",
+      "Bash(grep:*)"
     ],
     "deny": []
   }

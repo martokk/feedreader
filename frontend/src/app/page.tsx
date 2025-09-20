@@ -1,7 +1,8 @@
 'use client';
 
-import { ChevronDown, ChevronRight, ExternalLink, Filter, Folder, FolderPlus, Plus, RefreshCw, Rss, Settings, Upload } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { AlertTriangle, ChevronDown, ChevronRight, Edit, ExternalLink, Eye, EyeOff, Filter, Folder, FolderPlus, MoreVertical, Plus, RefreshCw, Rss, Settings, Upload, X } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import { Badge } from '@/components/ui/badge';
@@ -10,16 +11,31 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 
 import { api } from '@/lib/api';
 import { SSEClient } from '@/lib/sse';
-import { Category, Feed, Item } from '@/types';
+import { Category, Feed, Item, UserSettings } from '@/types';
 
 import { AddFeedDialog } from '@/components/dialogs/AddFeedDialog';
 import { CategoryDialog } from '@/components/dialogs/CategoryDialog';
 import { FeedSettingsDialog } from '@/components/dialogs/FeedSettingsDialog';
+import FeedItemActionTray from '@/components/feed/FeedItemActionTray';
+import { ReaderView } from '@/components/ReaderView';
+import { Settings as SettingsPage } from '@/components/Settings';
+import { ThemeToggle } from '@/components/theme-toggle';
 
 // Helper function to get feed title by feed_id
 const getFeedTitle = (feedId: string, feeds: Feed[]): string => {
   const feed = feeds.find(f => f.id === feedId);
   return feed?.title || 'Unknown Feed';
+};
+
+// Helper function to check if a feed has an error
+const isFeedInError = (feed: Feed): boolean => {
+  return !!(feed.last_error || (feed.last_status && (feed.last_status < 200 || feed.last_status >= 400)));
+};
+
+// Helper function to check if a category contains feeds with errors
+const categoryHasErrors = (categoryId: string, feedsByCategory: Record<string, Feed[]>): boolean => {
+  const categoryFeeds = feedsByCategory[categoryId] || [];
+  return categoryFeeds.some(feed => isFeedInError(feed));
 };
 
 // Helper function to format relative time
@@ -66,7 +82,10 @@ const formatRelativeTime = (dateString: string): string => {
   }
 };
 
-export default function HomePage() {
+function HomePageContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
   const [feeds, setFeeds] = useState<Feed[]>([]);
   const [items, setItems] = useState<Item[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -87,6 +106,70 @@ export default function HomePage() {
   const [showFeedSettingsDialog, setShowFeedSettingsDialog] = useState(false);
   const [selectedFeedForSettings, setSelectedFeedForSettings] = useState<Feed | null>(null);
   const [selectedCategoryForEdit, setSelectedCategoryForEdit] = useState<Category | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
+  const [selectedSettingsCategory, setSelectedSettingsCategory] = useState('behavior');
+  const [userSettings, setUserSettings] = useState<UserSettings | null>(null);
+
+  // Reader view state
+  const [showReaderView, setShowReaderView] = useState(false);
+  const [selectedItemForReader, setSelectedItemForReader] = useState<string | null>(null);
+
+  // Track initially read items (loaded as read) vs newly read items (marked read during session)
+  const [initiallyReadItems, setInitiallyReadItems] = useState<Set<string>>(new Set());
+
+  // Sync filterUnread with userSettings.hide_read_items when settings are loaded
+  useEffect(() => {
+    if (userSettings) {
+      // When hide_read_items is true, we want to hide read items
+      // filterUnread is used for the legacy dropdown logic, but we're not using it anymore
+      // We'll keep it synced for consistency, but the actual filtering uses userSettings.hide_read_items
+      setFilterUnread(userSettings.hide_read_items || false);
+    }
+  }, [userSettings]);
+
+  // Refs for scroll detection
+  const itemRefs = useRef<Map<string, HTMLElement>>(new Map());
+  const observerRef = useRef<IntersectionObserver | null>(null);
+
+  // URL parameter management
+  const updateUrlParams = useCallback((feedId?: string, categoryId?: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+
+    if (feedId) {
+      params.set('feed', feedId);
+      params.delete('category');
+    } else if (categoryId) {
+      params.set('category', categoryId);
+      params.delete('feed');
+    } else {
+      params.delete('feed');
+      params.delete('category');
+    }
+
+    router.replace(`?${params.toString()}`, { scroll: false });
+  }, [router, searchParams]);
+
+  // Restore state from URL params
+  const restoreStateFromUrl = useCallback(() => {
+    const feedId = searchParams.get('feed');
+    const categoryId = searchParams.get('category');
+
+    if (feedId) {
+      const feed = feeds.find(f => f.id === feedId);
+      if (feed) {
+        setSelectedFeed(feed);
+        setSelectedCategory(null);
+        loadFeedItems(feed);
+      }
+    } else if (categoryId) {
+      const category = categories.find(c => c.id === categoryId);
+      if (category) {
+        setSelectedCategory(category);
+        setSelectedFeed(null);
+        loadCategoryItems(category);
+      }
+    }
+  }, [searchParams, feeds, categories]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load initial data
   useEffect(() => {
@@ -100,12 +183,20 @@ export default function HomePage() {
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Restore state from URL when data loads
+  useEffect(() => {
+    if (feeds.length > 0 && categories.length >= 0) {
+      restoreStateFromUrl();
+    }
+  }, [feeds, categories, restoreStateFromUrl]);
+
   const loadInitialData = async () => {
     try {
       setLoading(true);
       const [feedsData, categoriesData] = await Promise.all([
         api.getFeeds(),
-        api.getCategories()
+        api.getCategories(),
+        loadUserSettings()
       ]);
       
       setFeeds(feedsData);
@@ -128,6 +219,26 @@ export default function HomePage() {
       toast.error('Failed to load data');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadUserSettings = async () => {
+    try {
+      const settings = await api.getUserSettings();
+      setUserSettings(settings);
+    } catch (error) {
+      console.error('Failed to load user settings:', error);
+      // Create default settings if none exist
+      try {
+        const defaultSettings = await api.createUserSettings({
+          theme: 'system',
+          mark_read_on_scroll: true,
+          hide_read_items: false
+        });
+        setUserSettings(defaultSettings);
+      } catch (createError) {
+        console.error('Failed to create default settings:', createError);
+      }
     }
   };
 
@@ -168,47 +279,97 @@ export default function HomePage() {
     setSseClient(client);
   };
 
-  const loadFeedItems = async (feed: Feed) => {
+  const loadFeedItems = useCallback(async (feed: Feed, customFilterUnread?: boolean, skipLoading?: boolean) => {
     try {
-      setItemsLoading(true);
+      if (!skipLoading) {
+        setItemsLoading(true);
+      }
+      const shouldFilterUnread = customFilterUnread !== undefined ? customFilterUnread : filterUnread;
+      
+      // If hide_read_items is enabled, we need to load ALL items to properly track initially read ones
+      // Otherwise, use the filter to reduce API payload
+      const useApiFilter = !userSettings?.hide_read_items && shouldFilterUnread;
+      
       const itemsData = await api.getFeedItems(feed.id, {
         limit: 100,
-        unread_only: filterUnread
+        unread_only: useApiFilter
       });
       setItems(itemsData);
+
+      // Track which items were initially read when loaded
+      const initiallyRead = new Set<string>();
+      itemsData.forEach(item => {
+        if (item.is_read) {
+          initiallyRead.add(item.id);
+        }
+      });
+      setInitiallyReadItems(initiallyRead);
     } catch (error) {
       console.error('Failed to load feed items:', error);
       toast.error('Failed to load items');
     } finally {
-      setItemsLoading(false);
+      if (!skipLoading) {
+        setItemsLoading(false);
+      }
     }
-  };
+  }, [filterUnread, userSettings?.hide_read_items]);
 
-  const loadCategoryItems = async (category: Category) => {
+  const loadCategoryItems = useCallback(async (category: Category, customFilterUnread?: boolean, skipLoading?: boolean) => {
     try {
-      setItemsLoading(true);
+      if (!skipLoading) {
+        setItemsLoading(true);
+      }
+      const shouldFilterUnread = customFilterUnread !== undefined ? customFilterUnread : filterUnread;
+      
+      // If hide_read_items is enabled, we need to load ALL items to properly track initially read ones
+      // Otherwise, use the filter to reduce API payload
+      const useApiFilter = !userSettings?.hide_read_items && shouldFilterUnread;
+      
       const itemsData = await api.getCategoryItems(category.id, {
         limit: 100,
-        read_status: filterUnread ? 'unread' : undefined
+        read_status: useApiFilter ? 'unread' : undefined
       });
       setItems(itemsData);
+
+      // Track which items were initially read when loaded
+      const initiallyRead = new Set<string>();
+      itemsData.forEach(item => {
+        if (item.is_read) {
+          initiallyRead.add(item.id);
+        }
+      });
+      setInitiallyReadItems(initiallyRead);
     } catch (error) {
       console.error('Failed to load category items:', error);
       toast.error('Failed to load items');
     } finally {
-      setItemsLoading(false);
+      if (!skipLoading) {
+        setItemsLoading(false);
+      }
     }
-  };
+  }, [filterUnread, userSettings?.hide_read_items]);
 
   const handleFeedSelect = (feed: Feed) => {
+    // Close reader view if open
+    if (showReaderView) {
+      setShowReaderView(false);
+      setSelectedItemForReader(null);
+    }
     setSelectedFeed(feed);
     setSelectedCategory(null);
+    updateUrlParams(feed.id);
     loadFeedItems(feed);
   };
 
   const handleCategorySelect = (category: Category) => {
+    // Close reader view if open
+    if (showReaderView) {
+      setShowReaderView(false);
+      setSelectedItemForReader(null);
+    }
     setSelectedCategory(category);
     setSelectedFeed(null);
+    updateUrlParams(undefined, category.id);
     loadCategoryItems(category);
   };
 
@@ -225,7 +386,7 @@ export default function HomePage() {
   const handleMarkAsRead = async (item: Item) => {
     try {
       await api.markItemRead(item.id, !item.is_read);
-      setItems(prev => prev.map(i => 
+      setItems(prev => prev.map(i =>
         i.id === item.id ? { ...i, is_read: !item.is_read } : i
       ));
       toast.success(item.is_read ? 'Marked as unread' : 'Marked as read');
@@ -235,8 +396,107 @@ export default function HomePage() {
     }
   };
 
+  const handleOpenReader = (itemId: string) => {
+    setSelectedItemForReader(itemId);
+    setShowReaderView(true);
+  };
+
+  const handleCloseReader = () => {
+    setShowReaderView(false);
+    setSelectedItemForReader(null);
+  };
+
+  const handleReaderMarkAsRead = (itemId: string, isRead: boolean) => {
+    setItems(prev => prev.map(i =>
+      i.id === itemId ? { ...i, is_read: isRead } : i
+    ));
+  };
+
+  const markItemAsRead = useCallback(async (itemId: string) => {
+    try {
+      await api.markItemRead(itemId, true);
+      setItems(prev => prev.map(i =>
+        i.id === itemId ? { ...i, is_read: true } : i
+      ));
+      // Don't add to initiallyReadItems since this was marked during the session
+    } catch (error) {
+      console.error('Failed to mark item as read:', error);
+    }
+  }, []);
+
+  // Set up intersection observer for scroll-to-read functionality
+  useEffect(() => {
+    // Only set up observer if mark read on scroll is enabled
+    if (!userSettings?.mark_read_on_scroll) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          const itemId = entry.target.getAttribute('data-item-id');
+          if (!itemId) return;
+
+          const item = items.find(i => i.id === itemId);
+          if (!item || item.is_read) return;
+
+          // If item is no longer intersecting (scrolled out of view), mark as read
+          // Check if it's scrolled up (top < 0) or down (bottom below viewport)
+          if (!entry.isIntersecting) {
+            const rect = entry.boundingClientRect;
+
+            // Item has scrolled past the top or bottom of viewport
+            if (rect.top < 0 || rect.bottom < 0) {
+              markItemAsRead(itemId);
+            }
+          }
+        });
+      },
+      {
+        root: null, // viewport
+        rootMargin: '100px 0px 100px 0px', // Extra margin to trigger earlier
+        threshold: [0, 0.1, 0.5, 1] // Multiple thresholds for better detection
+      }
+    );
+
+    observerRef.current = observer;
+
+    // Observe all currently mounted item elements
+    itemRefs.current.forEach((element) => {
+      observer.observe(element);
+    });
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [userSettings?.mark_read_on_scroll, items, markItemAsRead]);
+
+  const setItemRef = useCallback((itemId: string, element: HTMLElement | null) => {
+    if (element) {
+      itemRefs.current.set(itemId, element);
+      // If observer is set up, observe this element
+      if (observerRef.current && userSettings?.mark_read_on_scroll) {
+        observerRef.current.observe(element);
+      }
+    } else {
+      // Clean up when element is unmounted
+      const oldElement = itemRefs.current.get(itemId);
+      if (oldElement && observerRef.current) {
+        observerRef.current.unobserve(oldElement);
+      }
+      itemRefs.current.delete(itemId);
+    }
+  }, [userSettings?.mark_read_on_scroll]);
+
   const filteredItems = items.filter(item => {
-    if (filterUnread && item.is_read) return false;
+    // If hide_read_items setting is enabled (which is synced with filterUnread):
+    // - Only hide items that were initially read (loaded as read)
+    // - Items marked as read during this session should remain visible (just dimmed)
+    if (userSettings?.hide_read_items && item.is_read && initiallyReadItems.has(item.id)) {
+      return false;
+    }
+    
+    // If hide_read_items is disabled (Show All mode), show all items
     return true;
   });
 
@@ -303,6 +563,22 @@ export default function HomePage() {
     setShowCategoryDialog(false);
     setSelectedCategoryForEdit(null);
     await loadInitialData(); // Refresh data after category edit
+  };
+
+  const handleOpenSettings = () => {
+    setShowSettings(true);
+  };
+
+  const handleCloseSettings = () => {
+    setShowSettings(false);
+    // Reload user settings to pick up any changes made in settings
+    loadUserSettings();
+    // Restore state from URL when closing settings
+    restoreStateFromUrl();
+  };
+
+  const handleSettingsChanged = (newSettings: UserSettings) => {
+    setUserSettings(newSettings);
   };
 
   const handleOpmlImport = async (file: File) => {
@@ -490,51 +766,144 @@ export default function HomePage() {
 
           {/* Main Content Header */}
           <div className="flex-1 px-6 flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              {(selectedFeed || selectedCategory) && (
-                <div>
-                  <h2 className="text-lg font-semibold">
+            {showSettings ? (
+              /* Settings header */
+              <>
+                {/* Left spacer */}
+                <div className="flex-1"></div>
+                
+                {/* Centered Settings title */}
+                <div className="flex items-center space-x-2">
+                  <h2 className="text-lg font-semibold">Settings</h2>
+                </div>
+                
+                {/* Right spacer */}
+                <div className="flex-1"></div>
+              </>
+            ) : showReaderView ? (
+              <>
+                {/* Left spacer */}
+                <div className="flex-1"></div>
+
+                {/* Centered title */}
+                <div className="flex items-center space-x-2">
+                  <h2 className="text-lg font-semibold">Reader View</h2>
+                </div>
+
+                {/* Right side - Close button */}
+                <div className="flex-1 flex justify-end">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleCloseReader}
+                  >
+                    <X className="h-4 w-4 mr-2" />
+                    Close
+                  </Button>
+                </div>
+              </>
+            ) : (selectedFeed || selectedCategory) ? (
+              <>
+                {/* Left spacer */}
+                <div className="flex-1"></div>
+                
+                {/* Centered title with unread counter */}
+                <div className="flex items-center space-x-2">
+                  {selectedCategory && (
+                    <>
+                      {/* Category color indicator */}
+                      {selectedCategory.color && (
+                        <div 
+                          className="w-3 h-3 rounded-full border"
+                          style={{ backgroundColor: selectedCategory.color }}
+                        />
+                      )}
+                      {/* Category folder icon */}
+                      <Folder className="h-4 w-4" />
+                    </>
+                  )}
+                  <h2 
+                    className={`text-lg font-semibold ${selectedFeed ? 'cursor-pointer hover:text-primary transition-colors' : ''}`}
+                    onClick={() => {
+                      if (selectedFeed) {
+                        handleOpenFeedSettings(selectedFeed);
+                      }
+                    }}
+                    title={selectedFeed ? 'Click to edit feed settings' : undefined}
+                  >
                     {selectedFeed ? selectedFeed.title || 'Untitled Feed' : selectedCategory?.name}
                   </h2>
-                  <p className="text-sm text-muted-foreground">
-                    {selectedFeed ? selectedFeed.url : selectedCategory?.description}
-                  </p>
+                  {unreadCount > 0 && (
+                    <Badge className="text-xs bg-black text-white hover:bg-black/80 dark:bg-white dark:text-black dark:hover:bg-white/80">
+                      {unreadCount}
+                    </Badge>
+                  )}
                 </div>
-              )}
-            </div>
-
-            <div className="flex items-center space-x-2">
-              {(selectedFeed || selectedCategory) && (
-                <>
-                  <Button
-                    variant={filterUnread ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setFilterUnread(!filterUnread)}
-                  >
-                    <Filter className="h-4 w-4 mr-2" />
-                    {filterUnread ? "Show All" : "Unread Only"} ({unreadCount})
-                  </Button>
-                  {selectedFeed && (
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => handleOpenFeedSettings(selectedFeed)}
-                    >
-                      <Settings className="h-4 w-4" />
-                    </Button>
-                  )}
-                  {selectedCategory && (
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => handleOpenCategorySettings(selectedCategory)}
-                    >
-                      <Settings className="h-4 w-4" />
-                    </Button>
-                  )}
-                </>
-              )}
-            </div>
+                
+                {/* Right side - 3-dot menu */}
+                <div className="flex-1 flex justify-end">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                      >
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={async () => {
+                        const newFilterValue = !filterUnread;
+                        setFilterUnread(newFilterValue);
+                        
+                        // Save the setting to backend
+                        try {
+                          const updatedSettings = await api.updateUserSettings({ hide_read_items: newFilterValue });
+                          setUserSettings(updatedSettings);
+                        } catch (error) {
+                          console.error('Failed to save hide read items setting:', error);
+                          toast.error('Failed to save setting');
+                          // Revert on error
+                          setFilterUnread(!newFilterValue);
+                          return;
+                        }
+                        
+                        // Reload items with the new filter, skip loading state for smooth transition
+                        if (selectedFeed) {
+                          loadFeedItems(selectedFeed, newFilterValue, true);
+                        } else if (selectedCategory) {
+                          loadCategoryItems(selectedCategory, newFilterValue, true);
+                        }
+                      }}>
+                        <Filter className="h-4 w-4 mr-2" />
+                        {filterUnread ? "Show All" : "Hide Read"}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        onClick={() => {
+                          if (selectedFeed) {
+                            handleOpenFeedSettings(selectedFeed);
+                          } else if (selectedCategory) {
+                            handleOpenCategorySettings(selectedCategory);
+                          }
+                        }}
+                      >
+                        <Edit className="h-4 w-4 mr-2" />
+                        {selectedFeed ? "Edit Feed" : "Edit Category"}
+                      </DropdownMenuItem>
+                      {selectedFeed && selectedFeed.url && (
+                        <DropdownMenuItem onClick={() => window.open(selectedFeed.url, '_blank')}>
+                          <ExternalLink className="h-4 w-4 mr-2" />
+                          Open RSS URL
+                        </DropdownMenuItem>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </>
+            ) : (
+              /* Empty state - no content selected */
+              <div className="flex-1"></div>
+            )}
           </div>
         </div>
       </header>
@@ -569,6 +938,9 @@ export default function HomePage() {
                         >
                           {expandedCategories.has(category.id) ? <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />}
                         </Button>
+                        {categoryHasErrors(category.id, feedsByCategory) && (
+                          <AlertTriangle className="h-4 w-4 flex-shrink-0 text-red-500" />
+                        )}
                         {category.color && (
                           <div 
                             className="w-3 h-3 rounded-full border"
@@ -576,7 +948,9 @@ export default function HomePage() {
                           />
                         )}
                         <Folder className="h-4 w-4 flex-shrink-0" />
-                        <span className="flex-1 truncate">{category.name}</span>
+                        <span className={`flex-1 truncate ${categoryHasErrors(category.id, feedsByCategory) ? 'text-red-500' : ''}`}>
+                          {category.name}
+                        </span>
                         {(category.unread_count || 0) > 0 && (
                           <span className="ml-auto text-xs font-semibold text-muted-foreground/80 pr-2">
                             {(category.unread_count || 0)}
@@ -600,8 +974,13 @@ export default function HomePage() {
                             onDragEnd={handleDragEnd}
                           >
                             <div className="flex items-center space-x-2 flex-1 min-w-0">
+                              {isFeedInError(feed) && (
+                                <AlertTriangle className="h-3 w-3 flex-shrink-0 text-red-500" />
+                              )}
                               <Rss className="h-3 w-3 flex-shrink-0" />
-                              <span className="text-sm truncate">{feed.title || 'Untitled Feed'}</span>
+                              <span className={`text-sm truncate ${isFeedInError(feed) ? 'text-red-500' : ''}`}>
+                                {feed.title || 'Untitled Feed'}
+                              </span>
                             </div>
                             {(feed.unread_count || 0) > 0 && (
                               <span className="ml-auto text-xs font-semibold text-muted-foreground/80 pr-2">
@@ -639,8 +1018,13 @@ export default function HomePage() {
                         onDragEnd={handleDragEnd}
                       >
                         <div className="flex items-center space-x-2 flex-1 min-w-0">
+                          {isFeedInError(feed) && (
+                            <AlertTriangle className="h-4 w-4 flex-shrink-0 text-red-500" />
+                          )}
                           <Rss className="h-4 w-4 flex-shrink-0" />
-                          <span className="font-medium truncate">{feed.title || 'Untitled Feed'}</span>
+                          <span className={`font-medium truncate ${isFeedInError(feed) ? 'text-red-500' : ''}`}>
+                            {feed.title || 'Untitled Feed'}
+                          </span>
                         </div>
                         {(feed.unread_count || 0) > 0 && (
                           <span className="ml-auto text-xs font-semibold text-muted-foreground/80 pr-2">
@@ -661,10 +1045,8 @@ export default function HomePage() {
               <Button variant="outline" size="sm" onClick={() => loadInitialData()}>
                 <RefreshCw className="h-4 w-4" />
               </Button>
-              <Button variant="outline" size="sm">
-                Theme
-              </Button>
-              <Button variant="outline" size="sm">
+              <ThemeToggle />
+              <Button variant="outline" size="sm" onClick={handleOpenSettings}>
                 <Settings className="h-4 w-4" />
               </Button>
             </div>
@@ -673,16 +1055,23 @@ export default function HomePage() {
 
         {/* Main Content */}
         <div className="flex-1">
-          {(selectedFeed || selectedCategory) ? (
+          {showSettings ? (
+            <SettingsPage
+              selectedCategory={selectedSettingsCategory}
+              onCategoryChange={setSelectedSettingsCategory}
+              onClose={handleCloseSettings}
+              onSettingsChanged={handleSettingsChanged}
+            />
+          ) : showReaderView && selectedItemForReader ? (
+            <ReaderView
+              itemId={selectedItemForReader}
+              feeds={feeds}
+              onClose={handleCloseReader}
+              onMarkAsRead={handleReaderMarkAsRead}
+            />
+          ) : (selectedFeed || selectedCategory) ? (
             <div className="h-[calc(100vh-4rem)] overflow-y-auto">
-                  {itemsLoading ? (
-                    <div className="flex items-center justify-center h-64">
-                      <div className="text-center">
-                        <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4" />
-                        <p className="text-muted-foreground">Loading articles...</p>
-                      </div>
-                    </div>
-                  ) : filteredItems.length === 0 ? (
+                  {filteredItems.length === 0 ? (
                     <div className="flex items-center justify-center h-64">
                       <div className="text-center">
                         <Rss className="h-16 w-16 mx-auto mb-4 opacity-50 text-muted-foreground" />
@@ -690,42 +1079,70 @@ export default function HomePage() {
                       </div>
                     </div>
                   ) : (
-                    <div className="max-w-4xl mx-auto">
+                    <div className="max-w-feed mx-auto">
                       {/* Clean vertical list layout */}
                       <div className="divide-y divide-border">
                         {filteredItems.map((item) => (
                           <article
                             key={item.id}
-                            className={`group cursor-pointer transition-colors hover:bg-accent/30 ${
-                              item.is_read ? 'opacity-70' : ''
+                            ref={(el) => setItemRef(item.id, el)}
+                            data-item-id={item.id}
+                            className={`group relative cursor-pointer transition-colors hover:bg-accent/30 ${
+                              item.is_read ? 'opacity-50' : ''
                             }`}
-                            onClick={() => handleMarkAsRead(item)}
+                            onClick={() => handleOpenReader(item.id)}
                           >
-                                                        <div className="px-6 py-5">
-                              <div className="flex items-start gap-4">
-                                {/* Placeholder image */}
-                                <div className="w-16 h-16 bg-gradient-to-br from-primary/10 to-secondary/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                                  <Rss className="h-6 w-6 text-primary/40" />
+                            <div className="px-6 py-5 relative">
+                              <div className="flex items-stretch gap-4 min-h-[6rem]">
+                                {/* RSS item image with fallback to placeholder - 4:3 aspect ratio landscape */}
+                                <div className={`w-[149px] h-[112px] rounded-lg overflow-hidden flex-shrink-0 ${
+                                  item.is_read ? 'opacity-60' : ''
+                                }`}>
+                                  {item.image_url ? (
+                                    <img 
+                                      src={item.image_url}
+                                      alt={item.title || 'Article image'}
+                                      className="w-full h-full object-cover"
+                                      onError={(e) => {
+                                        // Fallback to placeholder on image load error
+                                        const target = e.target as HTMLImageElement;
+                                        target.style.display = 'none';
+                                        const placeholder = target.nextElementSibling as HTMLElement;
+                                        if (placeholder) placeholder.style.display = 'flex';
+                                      }}
+                                    />
+                                  ) : null}
+                                  <div 
+                                    className={`w-full h-full bg-gradient-to-br from-primary/5 to-secondary/5 flex items-center justify-center ${
+                                      item.image_url ? 'hidden' : 'flex'
+                                    }`}
+                                  >
+                                    <Rss className="h-16 w-16 text-primary/5" />
+                                  </div>
                                 </div>
                                 
                                 <div className="flex-1 min-w-0 flex justify-between">
                                   <div className="flex-1 min-w-0">
-                                    <h3 className={`text-base font-normal mb-1 leading-relaxed line-clamp-2 ${
-                                      item.is_read ? 'text-muted-foreground' : 'text-foreground hover:text-primary transition-colors'
-                                    }`}>
-                                      {item.title || 'Untitled'}
-                                    </h3>
+                                    <div className="flex items-start gap-2 mb-1">
+                                      <h3 className={`feed-item-title text-base font-normal line-clamp-2 flex-1 min-w-0 ${
+                                        item.is_read ? 'text-muted-foreground/70' : 'text-foreground hover:text-primary transition-colors'
+                                      }`}>
+                                        {item.title || 'Untitled'}
+                                      </h3>
+                                    </div>
                                     
                                     {item.published_at && (
                                       <div className="mb-2 flex items-center gap-2">
-                                        <span className={`text-xs font-medium ${
-                                          item.is_read ? 'text-muted-foreground/40' : 'text-muted-foreground/60'
+                                        <span className={`feed-item-meta text-xs font-medium ${
+                                          item.is_read ? 'text-muted-foreground/50' : 'text-muted-foreground/60'
                                         }`}>
                                           {getFeedTitle(item.feed_id, feeds)}
                                         </span>
-                                        <span className="text-muted-foreground/40">•</span>
-                                        <span className={`text-xs font-medium ${
-                                          item.is_read ? 'text-muted-foreground/60' : 'text-muted-foreground'
+                                        <span className={`${
+                                          item.is_read ? 'text-muted-foreground/40' : 'text-muted-foreground/40'
+                                        }`}>•</span>
+                                        <span className={`feed-item-meta text-xs font-medium ${
+                                          item.is_read ? 'text-muted-foreground/50' : 'text-muted-foreground/60'
                                         }`}>
                                           {formatRelativeTime(item.published_at)}
                                         </span>
@@ -733,8 +1150,8 @@ export default function HomePage() {
                                     )}
                                     
                                     {item.content_text && (
-                                      <p className={`text-sm mb-3 line-clamp-2 leading-relaxed ${
-                                        item.is_read ? 'text-muted-foreground/80' : 'text-muted-foreground'
+                                      <p className={`feed-item-content text-sm mb-3 line-clamp-2 ${
+                                        item.is_read ? 'text-muted-foreground/60' : 'text-muted-foreground'
                                       }`}>
                                         {item.content_text}
                                       </p>
@@ -742,7 +1159,9 @@ export default function HomePage() {
                                     
                                     <div className="flex items-center gap-3 text-sm text-muted-foreground">
                                       {selectedCategory && selectedFeed && (
-                                        <span className="text-xs font-medium">
+                                        <span className={`text-xs font-medium ${
+                                          item.is_read ? 'text-muted-foreground/50' : 'text-muted-foreground/70'
+                                        }`}>
                                           {selectedFeed.title || 'Unknown Source'}
                                         </span>
                                       )}
@@ -750,30 +1169,57 @@ export default function HomePage() {
                                   </div>
                                   
                                   <div className="flex items-start space-x-2 flex-shrink-0">
-                                    {item.url && (
-                                      <a
-                                        href={item.url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="text-muted-foreground hover:text-primary transition-colors p-1"
-                                        onClick={(e) => e.stopPropagation()}
-                                      >
-                                        <ExternalLink className="h-4 w-4" />
-                                      </a>
-                                    )}
-                                    {!item.is_read && (
-                                      <div className="w-2 h-2 bg-primary rounded-full mt-1" />
-                                    )}
                                     {item.starred && (
-                                      <Badge variant="secondary" className="text-xs">★</Badge>
+                                      <Badge variant="secondary" className={`text-xs ${
+                                        item.is_read ? 'opacity-60' : ''
+                                      }`}>★</Badge>
                                     )}
                                   </div>
                                 </div>
                               </div>
+                              
+                              {/* Action Tray - appears on hover */}
+                              <FeedItemActionTray>
+                              {item.url && (
+                                <a
+                                  href={item.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className={`text-muted-foreground hover:text-primary transition-colors p-1 rounded hover:bg-accent/50 ${
+                                    item.is_read ? 'opacity-60' : ''
+                                  }`}
+                                  onClick={(e) => e.stopPropagation()}
+                                  aria-label="Open original article"
+                                  title="Open original article"
+                                >
+                                  <ExternalLink className="h-5 w-5" />
+                                </a>
+                              )}
+                              <button
+                                className={`text-muted-foreground hover:text-primary transition-colors p-1 rounded hover:bg-accent/50 ${
+                                  item.is_read ? 'opacity-60' : ''
+                                }`}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleMarkAsRead(item);
+                                }}
+                                aria-label={item.is_read ? 'Mark as unread' : 'Mark as read'}
+                                title={item.is_read ? 'Mark as unread' : 'Mark as read'}
+                              >
+                                {item.is_read ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                              </button>
+                              </FeedItemActionTray>
                             </div>
                           </article>
                         ))}
                       </div>
+
+                      {/* Extra scroll space when Mark Read On Scroll is enabled */}
+                      {userSettings?.mark_read_on_scroll && filteredItems.length > 0 && (
+                        <div className="h-screen flex items-center justify-center text-muted-foreground/30 text-sm">
+                          Scroll past to mark all items as read
+                        </div>
+                      )}
                     </div>
                   )}
             </div>
@@ -812,6 +1258,7 @@ export default function HomePage() {
         categories={categories}
         onFeedUpdated={handleFeedUpdated}
         onFeedDeleted={handleFeedDeleted}
+        sseClient={sseClient}
       />
 
       <CategoryDialog
@@ -822,5 +1269,24 @@ export default function HomePage() {
         category={selectedCategoryForEdit}
       />
     </div>
+  );
+}
+
+function LoadingFallback() {
+  return (
+    <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="text-center space-y-4">
+        <Rss className="h-12 w-12 animate-spin mx-auto text-primary" />
+        <p className="text-muted-foreground">Loading RSS Reader...</p>
+      </div>
+    </div>
+  );
+}
+
+export default function HomePage() {
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <HomePageContent />
+    </Suspense>
   );
 }

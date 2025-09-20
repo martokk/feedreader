@@ -14,6 +14,16 @@ docker compose down
 
 # View logs
 docker compose logs -f [service_name]
+
+# IMPORTANT: Build containers after code changes
+# Docker Compose does NOT automatically update containers when code changes
+# You MUST rebuild after making changes to Python code
+docker compose build
+docker compose up -d
+
+# Or rebuild specific services
+docker compose build api worker
+docker compose up api worker -d
 ```
 
 ### API Development (FastAPI)

@@ -49,9 +49,10 @@ class ContentExtractor:
             html_content = trafilatura.extract(
                 html,
                 url=url,
-                output_format="xml",
+                output_format="html",
                 include_formatting=True,
                 include_links=True,
+                include_images=True,
             )
 
             return html_content, text_content
@@ -277,6 +278,45 @@ class FeedFetcher:
                 elif hasattr(entry, "summary"):
                     content_html = entry.summary
 
+                # Extract image URL from entry
+                image_url = None
+
+                # Try media:thumbnail first (common in RSS 2.0)
+                if hasattr(entry, "media_thumbnail") and entry.media_thumbnail:
+                    image_url = entry.media_thumbnail[0].get("url")
+                # Try enclosure for media files
+                elif hasattr(entry, "enclosures") and entry.enclosures:
+                    for enclosure in entry.enclosures:
+                        if enclosure.get("type", "").startswith("image/"):
+                            image_url = enclosure.get("href")
+                            break
+                # Try links for images
+                elif hasattr(entry, "links") and entry.links:
+                    for link in entry.links:
+                        if link.get("type", "").startswith("image/"):
+                            image_url = link.get("href")
+                            break
+                # Try media_content
+                elif hasattr(entry, "media_content") and entry.media_content:
+                    for media in entry.media_content:
+                        if media.get("type", "").startswith("image/"):
+                            image_url = media.get("url")
+                            break
+
+                # Fallback: look for images in content
+                if not image_url and content_html:
+                    import re
+
+                    img_match = re.search(
+                        r'<img[^>]+src=["\']([^"\']+)["\']', content_html, re.IGNORECASE
+                    )
+                    if img_match:
+                        image_url = img_match.group(1)
+
+                # Ensure image URL is valid and truncate if too long
+                if image_url and len(image_url) > 2048:
+                    image_url = image_url[:2048]
+
                 # Extract full content if URL available
                 if url and settings.extraction_engine != "none":
                     try:
@@ -307,6 +347,7 @@ class FeedFetcher:
                     "guid": guid,
                     "title": title,
                     "url": url,
+                    "image_url": image_url,
                     "content_html": content_html,
                     "content_text": content_text,
                     "published_at": published_at,

@@ -10,6 +10,7 @@ class ItemResponse(BaseModel):
     feed_id: uuid.UUID
     title: Optional[str]
     url: Optional[str]
+    image_url: Optional[str]
     content_text: Optional[str]
     published_at: Optional[datetime]
     fetched_at: datetime
@@ -26,6 +27,7 @@ class ItemDetail(BaseModel):
     feed_id: uuid.UUID
     title: Optional[str]
     url: Optional[str]
+    image_url: Optional[str]
     content_html: Optional[str]
     content_text: Optional[str]
     published_at: Optional[datetime]
