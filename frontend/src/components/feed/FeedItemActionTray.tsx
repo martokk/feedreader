@@ -35,7 +35,7 @@ export default function FeedItemActionTray({
         className
       )}
     >
-      <div className="flex items-center gap-1 rounded-md border border-border bg-background/80 px-1.5 py-1 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="flex items-center gap-1 rounded-md border bg-background px-1.5 py-1">
         {children}
       </div>
     </div>

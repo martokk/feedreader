@@ -146,6 +146,7 @@
 
   /* Custom max-width for feed container - slightly wider than 4xl but not as wide as 5xl */
   .max-w-feed {
-    max-width: 960px; /* 60rem - between 4xl (56rem/896px) and 5xl (64rem/1024px) */
+    max-width: 1000px;
+    /* 60rem - between 4xl (56rem/896px) and 5xl (64rem/1024px) */
   }
 }
