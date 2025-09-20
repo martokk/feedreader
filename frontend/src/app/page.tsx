@@ -995,9 +995,9 @@ function HomePageContent() {
                             onClick={() => handleMarkAsRead(item)}
                           >
                             <div className="px-6 py-5">
-                              <div className="flex items-start gap-4">
-                                {/* RSS item image with fallback to placeholder */}
-                                <div className={`w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 ${
+                              <div className="flex items-stretch gap-4 min-h-[6rem]">
+                                {/* RSS item image with fallback to placeholder - 4:3 aspect ratio landscape */}
+                                <div className={`w-[149px] h-[112px] rounded-lg overflow-hidden flex-shrink-0 ${
                                   item.is_read ? 'opacity-60' : ''
                                 }`}>
                                   {item.image_url ? (
@@ -1015,11 +1015,11 @@ function HomePageContent() {
                                     />
                                   ) : null}
                                   <div 
-                                    className={`w-full h-full bg-gradient-to-br from-primary/10 to-secondary/10 flex items-center justify-center ${
+                                    className={`w-full h-full bg-gradient-to-br from-primary/5 to-secondary/5 flex items-center justify-center ${
                                       item.image_url ? 'hidden' : 'flex'
                                     }`}
                                   >
-                                    <Rss className="h-6 w-6 text-primary/40" />
+                                    <Rss className="h-16 w-16 text-primary/5" />
                                   </div>
                                 </div>
                                 
