@@ -1124,7 +1124,7 @@ function HomePageContent() {
                                 <div className="flex-1 min-w-0 flex justify-between">
                                   <div className="flex-1 min-w-0">
                                     <div className="flex items-start gap-2 mb-1">
-                                      <h3 className={`text-base font-normal leading-relaxed line-clamp-2 flex-1 min-w-0 ${
+                                      <h3 className={`feed-item-title text-base font-normal line-clamp-2 flex-1 min-w-0 ${
                                         item.is_read ? 'text-muted-foreground/70' : 'text-foreground hover:text-primary transition-colors'
                                       }`}>
                                         {item.title || 'Untitled'}
@@ -1133,7 +1133,7 @@ function HomePageContent() {
                                     
                                     {item.published_at && (
                                       <div className="mb-2 flex items-center gap-2">
-                                        <span className={`text-xs font-medium ${
+                                        <span className={`feed-item-meta text-xs font-medium ${
                                           item.is_read ? 'text-muted-foreground/50' : 'text-muted-foreground/60'
                                         }`}>
                                           {getFeedTitle(item.feed_id, feeds)}
@@ -1141,7 +1141,7 @@ function HomePageContent() {
                                         <span className={`${
                                           item.is_read ? 'text-muted-foreground/40' : 'text-muted-foreground/40'
                                         }`}>•</span>
-                                        <span className={`text-xs font-medium ${
+                                        <span className={`feed-item-meta text-xs font-medium ${
                                           item.is_read ? 'text-muted-foreground/50' : 'text-muted-foreground/60'
                                         }`}>
                                           {formatRelativeTime(item.published_at)}
@@ -1150,7 +1150,7 @@ function HomePageContent() {
                                     )}
                                     
                                     {item.content_text && (
-                                      <p className={`text-sm mb-3 line-clamp-2 leading-relaxed ${
+                                      <p className={`feed-item-content text-sm mb-3 line-clamp-2 ${
                                         item.is_read ? 'text-muted-foreground/60' : 'text-muted-foreground'
                                       }`}>
                                         {item.content_text}

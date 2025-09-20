@@ -274,4 +274,19 @@
     max-width: 1000px;
     /* 60rem - between 4xl (56rem/896px) and 5xl (64rem/1024px) */
   }
+
+  /* Feed items list styling for better readability */
+  .feed-item-title {
+    font-size: 1.2em;
+    line-height: 1.5;
+  }
+
+  .feed-item-content {
+    font-size: 1.1em;
+    line-height: 1.6;
+  }
+
+  .feed-item-meta {
+    font-size: 0.95em;
+  }
 }
