@@ -1,7 +1,7 @@
 'use client';
 
 import { AlertTriangle, ChevronDown, ChevronRight, Edit, ExternalLink, Filter, Folder, FolderPlus, MoreVertical, Plus, RefreshCw, Rss, Settings, Upload } from 'lucide-react';
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import { Badge } from '@/components/ui/badge';
@@ -15,8 +15,8 @@ import { Category, Feed, Item, UserSettings } from '@/types';
 import { AddFeedDialog } from '@/components/dialogs/AddFeedDialog';
 import { CategoryDialog } from '@/components/dialogs/CategoryDialog';
 import { FeedSettingsDialog } from '@/components/dialogs/FeedSettingsDialog';
-import { ThemeToggle } from '@/components/theme-toggle';
 import { Settings as SettingsPage } from '@/components/Settings';
+import { ThemeToggle } from '@/components/theme-toggle';
 
 // Helper function to get feed title by feed_id
 const getFeedTitle = (feedId: string, feeds: Feed[]): string => {
@@ -208,35 +208,45 @@ export default function HomePage() {
     setSseClient(client);
   };
 
-  const loadFeedItems = async (feed: Feed) => {
+  const loadFeedItems = async (feed: Feed, customFilterUnread?: boolean, skipLoading?: boolean) => {
     try {
-      setItemsLoading(true);
+      if (!skipLoading) {
+        setItemsLoading(true);
+      }
+      const shouldFilterUnread = customFilterUnread !== undefined ? customFilterUnread : filterUnread;
       const itemsData = await api.getFeedItems(feed.id, {
         limit: 100,
-        unread_only: filterUnread
+        unread_only: shouldFilterUnread
       });
       setItems(itemsData);
     } catch (error) {
       console.error('Failed to load feed items:', error);
       toast.error('Failed to load items');
     } finally {
-      setItemsLoading(false);
+      if (!skipLoading) {
+        setItemsLoading(false);
+      }
     }
   };
 
-  const loadCategoryItems = async (category: Category) => {
+  const loadCategoryItems = async (category: Category, customFilterUnread?: boolean, skipLoading?: boolean) => {
     try {
-      setItemsLoading(true);
+      if (!skipLoading) {
+        setItemsLoading(true);
+      }
+      const shouldFilterUnread = customFilterUnread !== undefined ? customFilterUnread : filterUnread;
       const itemsData = await api.getCategoryItems(category.id, {
         limit: 100,
-        read_status: filterUnread ? 'unread' : undefined
+        read_status: shouldFilterUnread ? 'unread' : undefined
       });
       setItems(itemsData);
     } catch (error) {
       console.error('Failed to load category items:', error);
       toast.error('Failed to load items');
     } finally {
-      setItemsLoading(false);
+      if (!skipLoading) {
+        setItemsLoading(false);
+      }
     }
   };
 
@@ -611,7 +621,18 @@ export default function HomePage() {
           <div className="flex-1 px-6 flex items-center justify-between">
             {showSettings ? (
               /* Settings header */
-              <div className="flex-1"></div>
+              <>
+                {/* Left spacer */}
+                <div className="flex-1"></div>
+                
+                {/* Centered Settings title */}
+                <div className="flex items-center space-x-2">
+                  <h2 className="text-lg font-semibold">Settings</h2>
+                </div>
+                
+                {/* Right spacer */}
+                <div className="flex-1"></div>
+              </>
             ) : (selectedFeed || selectedCategory) ? (
               <>
                 {/* Left spacer */}
@@ -662,7 +683,16 @@ export default function HomePage() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => setFilterUnread(!filterUnread)}>
+                      <DropdownMenuItem onClick={() => {
+                        const newFilterValue = !filterUnread;
+                        setFilterUnread(newFilterValue);
+                        // Reload items with the new filter, skip loading state for smooth transition
+                        if (selectedFeed) {
+                          loadFeedItems(selectedFeed, newFilterValue, true);
+                        } else if (selectedCategory) {
+                          loadCategoryItems(selectedCategory, newFilterValue, true);
+                        }
+                      }}>
                         <Filter className="h-4 w-4 mr-2" />
                         {filterUnread ? "Show All" : "Hide Read"}
                       </DropdownMenuItem>

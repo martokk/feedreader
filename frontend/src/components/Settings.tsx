@@ -1,20 +1,20 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { Monitor, Moon, Sun, X, Settings as SettingsIcon } from 'lucide-react';
+import { Monitor, Moon, Settings as SettingsIcon, Sun, X } from 'lucide-react';
 import { useTheme } from 'next-themes';
+import React, { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu';
 import { Switch } from '@/components/ui/switch';
 import { api } from '@/lib/api';
 import { UserSettings } from '@/types';
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuTrigger 
-} from '@/components/ui/dropdown-menu';
 
 interface SettingsProps {
   selectedCategory: string;
@@ -205,12 +205,11 @@ export function Settings({ selectedCategory, onCategoryChange, onClose }: Settin
   };
 
   return (
-    <div className="h-[calc(100vh-4rem)] flex">
-      {/* Settings Sidebar */}
-      <div className="w-64 border-r bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="p-4">
+    <div className="h-[calc(100vh-4rem)] overflow-y-auto">
+      <div className="max-w-4xl mx-auto">
+        <div className="p-6">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-semibold">Settings</h2>
+            <div></div>
             <Button
               variant="ghost"
               size="sm"
@@ -221,31 +220,30 @@ export function Settings({ selectedCategory, onCategoryChange, onClose }: Settin
             </Button>
           </div>
           
-          <nav className="space-y-1">
-            {settingsCategories.map((category) => {
-              const Icon = category.icon;
-              return (
-                <button
-                  key={category.id}
-                  onClick={() => onCategoryChange(category.id)}
-                  className={`w-full flex items-center px-3 py-2 text-sm rounded-lg transition-colors ${
-                    selectedCategory === category.id
-                      ? 'bg-accent text-accent-foreground'
-                      : 'hover:bg-accent/50'
-                  }`}
-                >
-                  <Icon className="h-4 w-4 mr-3" />
-                  {category.label}
-                </button>
-              );
-            })}
-          </nav>
-        </div>
-      </div>
-
-      {/* Settings Content */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="p-6">
+          {/* Settings Navigation */}
+          <div className="mb-8">
+            <nav className="flex space-x-1 bg-muted/50 p-1 rounded-lg w-fit">
+              {settingsCategories.map((category) => {
+                const Icon = category.icon;
+                return (
+                  <button
+                    key={category.id}
+                    onClick={() => onCategoryChange(category.id)}
+                    className={`flex items-center px-4 py-2 text-sm rounded-md transition-colors ${
+                      selectedCategory === category.id
+                        ? 'bg-background text-foreground shadow-sm'
+                        : 'hover:bg-background/50 text-muted-foreground'
+                    }`}
+                  >
+                    <Icon className="h-4 w-4 mr-2" />
+                    {category.label}
+                  </button>
+                );
+              })}
+            </nav>
+          </div>
+          
+          {/* Settings Content */}
           {renderSettingsContent()}
         </div>
       </div>
