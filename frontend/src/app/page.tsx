@@ -1,7 +1,7 @@
 'use client';
 
 import { AlertTriangle, ChevronDown, ChevronRight, Edit, ExternalLink, Filter, Folder, FolderPlus, MoreVertical, Plus, RefreshCw, Rss, Settings, Upload } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { toast } from 'sonner';
 
 import { Badge } from '@/components/ui/badge';
@@ -10,7 +10,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 
 import { api } from '@/lib/api';
 import { SSEClient } from '@/lib/sse';
-import { Category, Feed, Item } from '@/types';
+import { Category, Feed, Item, UserSettings } from '@/types';
 
 import { AddFeedDialog } from '@/components/dialogs/AddFeedDialog';
 import { CategoryDialog } from '@/components/dialogs/CategoryDialog';
@@ -102,6 +102,11 @@ export default function HomePage() {
   const [selectedCategoryForEdit, setSelectedCategoryForEdit] = useState<Category | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [selectedSettingsCategory, setSelectedSettingsCategory] = useState('appearance');
+  const [userSettings, setUserSettings] = useState<UserSettings | null>(null);
+  
+  // Refs for scroll detection
+  const itemRefs = useRef<Map<string, HTMLElement>>(new Map());
+  const observerRef = useRef<IntersectionObserver | null>(null);
 
   // Load initial data
   useEffect(() => {
@@ -120,7 +125,8 @@ export default function HomePage() {
       setLoading(true);
       const [feedsData, categoriesData] = await Promise.all([
         api.getFeeds(),
-        api.getCategories()
+        api.getCategories(),
+        loadUserSettings()
       ]);
       
       setFeeds(feedsData);
@@ -143,6 +149,25 @@ export default function HomePage() {
       toast.error('Failed to load data');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadUserSettings = async () => {
+    try {
+      const settings = await api.getUserSettings();
+      setUserSettings(settings);
+    } catch (error) {
+      console.error('Failed to load user settings:', error);
+      // Create default settings if none exist
+      try {
+        const defaultSettings = await api.createUserSettings({ 
+          theme: 'system',
+          mark_read_on_scroll: true
+        });
+        setUserSettings(defaultSettings);
+      } catch (createError) {
+        console.error('Failed to create default settings:', createError);
+      }
     }
   };
 
@@ -249,6 +274,75 @@ export default function HomePage() {
       toast.error('Failed to update item');
     }
   };
+
+  const markItemAsRead = useCallback(async (itemId: string) => {
+    try {
+      await api.markItemRead(itemId, true);
+      setItems(prev => prev.map(i => 
+        i.id === itemId ? { ...i, is_read: true } : i
+      ));
+    } catch (error) {
+      console.error('Failed to mark item as read:', error);
+    }
+  }, []);
+
+  // Set up intersection observer for scroll-to-read functionality
+  useEffect(() => {
+    // Only set up observer if mark read on scroll is enabled
+    if (!userSettings?.mark_read_on_scroll) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          const itemId = entry.target.getAttribute('data-item-id');
+          if (!itemId) return;
+
+          const item = items.find(i => i.id === itemId);
+          if (!item || item.is_read) return;
+
+          // If item is no longer intersecting (scrolled out of view), mark as read
+          if (!entry.isIntersecting && entry.boundingClientRect.top < 0) {
+            markItemAsRead(itemId);
+          }
+        });
+      },
+      {
+        root: null, // viewport
+        rootMargin: '0px',
+        threshold: 0
+      }
+    );
+
+    observerRef.current = observer;
+
+    // Observe all currently mounted item elements
+    itemRefs.current.forEach((element) => {
+      observer.observe(element);
+    });
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [userSettings?.mark_read_on_scroll, items, markItemAsRead]);
+
+  const setItemRef = useCallback((itemId: string, element: HTMLElement | null) => {
+    if (element) {
+      itemRefs.current.set(itemId, element);
+      // If observer is set up, observe this element
+      if (observerRef.current && userSettings?.mark_read_on_scroll) {
+        observerRef.current.observe(element);
+      }
+    } else {
+      // Clean up when element is unmounted
+      const oldElement = itemRefs.current.get(itemId);
+      if (oldElement && observerRef.current) {
+        observerRef.current.unobserve(oldElement);
+      }
+      itemRefs.current.delete(itemId);
+    }
+  }, [userSettings?.mark_read_on_scroll]);
 
   const filteredItems = items.filter(item => {
     if (filterUnread && item.is_read) return false;
@@ -778,6 +872,8 @@ export default function HomePage() {
                         {filteredItems.map((item) => (
                           <article
                             key={item.id}
+                            ref={(el) => setItemRef(item.id, el)}
+                            data-item-id={item.id}
                             className={`group cursor-pointer transition-colors hover:bg-accent/30 ${
                               item.is_read ? 'opacity-50' : ''
                             }`}

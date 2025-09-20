@@ -6,6 +6,7 @@ import { useTheme } from 'next-themes';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 import { api } from '@/lib/api';
 import { UserSettings } from '@/types';
 import { 
@@ -81,6 +82,29 @@ export function Settings({ selectedCategory, onCategoryChange, onClose }: Settin
     }
   };
 
+  const handleMarkReadOnScrollChange = async (enabled: boolean) => {
+    try {
+      // Update local state immediately for better UX
+      if (settings) {
+        setSettings({ ...settings, mark_read_on_scroll: enabled });
+      }
+      
+      // Save to database
+      const updatedSettings = await api.updateUserSettings({ mark_read_on_scroll: enabled });
+      setSettings(updatedSettings);
+      
+      toast.success('Mark read on scroll preference saved');
+    } catch (error) {
+      console.error('Failed to save mark read on scroll setting:', error);
+      toast.error('Failed to save preference');
+      
+      // Revert setting if save failed
+      if (settings?.mark_read_on_scroll !== undefined) {
+        setSettings({ ...settings, mark_read_on_scroll: !enabled });
+      }
+    }
+  };
+
   const getThemeIcon = (themeValue: string) => {
     switch (themeValue) {
       case 'light': return <Sun className="h-4 w-4" />;
@@ -140,6 +164,18 @@ export function Settings({ selectedCategory, onCategoryChange, onClose }: Settin
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+          </div>
+          <div className="flex items-center justify-between">
+            <div>
+              <label className="text-sm font-medium">Mark Read on Scroll</label>
+              <p className="text-sm text-muted-foreground">
+                Automatically mark articles as read when scrolled out of view
+              </p>
+            </div>
+            <Switch
+              checked={settings?.mark_read_on_scroll ?? true}
+              onCheckedChange={handleMarkReadOnScrollChange}
+            />
           </div>
         </div>
       </div>

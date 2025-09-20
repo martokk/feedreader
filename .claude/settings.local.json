@@ -8,7 +8,10 @@
       "Bash(curl:*)",
       "Bash(docker compose restart:*)",
       "Bash(docker compose logs:*)",
-      "Bash(docker compose:*)"
+      "Bash(docker compose:*)",
+      "Bash(alembic revision:*)",
+      "Bash(docker cp:*)",
+      "Bash(rm:*)"
     ],
     "deny": []
   }

@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .core.config import settings
 from .core.redis import close_redis
-from .routers import categories, feeds, health, items, opml, sse
+from .routers import categories, feeds, health, items, opml, sse, user_settings
 
 # Use uvloop for better async performance
 uvloop.install()
@@ -48,6 +48,7 @@ app.include_router(items.router, prefix="/api/v1")
 app.include_router(health.router, prefix="/api/v1")
 app.include_router(sse.router, prefix="/api/v1")
 app.include_router(opml.router, prefix="/api/v1")
+app.include_router(user_settings.router, prefix="/api/v1")
 
 
 @app.get("/")
@@ -68,5 +69,6 @@ async def api_root():
             "sse": "/api/v1/sse/events",
             "import": "/api/v1/opml/import",
             "export": "/api/v1/opml/export",
+            "settings": "/api/v1/settings",
         },
     }

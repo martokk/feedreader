@@ -110,14 +110,17 @@ export interface UserSettings {
   id: string;
   user_id?: string;
   theme: string;
+  mark_read_on_scroll?: boolean;
   created_at: string;
   updated_at: string;
 }
 
 export interface UserSettingsCreate {
   theme?: string;
+  mark_read_on_scroll?: boolean;
 }
 
 export interface UserSettingsUpdate {
   theme?: string;
+  mark_read_on_scroll?: boolean;
 } 
