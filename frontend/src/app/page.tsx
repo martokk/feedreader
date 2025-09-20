@@ -1,7 +1,8 @@
 'use client';
 
 import { AlertTriangle, ChevronDown, ChevronRight, Edit, ExternalLink, Filter, Folder, FolderPlus, MoreVertical, Plus, RefreshCw, Rss, Settings, Upload } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 
 import { Badge } from '@/components/ui/badge';
@@ -79,7 +80,10 @@ const formatRelativeTime = (dateString: string): string => {
   }
 };
 
-export default function HomePage() {
+function HomePageContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
   const [feeds, setFeeds] = useState<Feed[]>([]);
   const [items, setItems] = useState<Item[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -108,6 +112,46 @@ export default function HomePage() {
   const itemRefs = useRef<Map<string, HTMLElement>>(new Map());
   const observerRef = useRef<IntersectionObserver | null>(null);
 
+  // URL parameter management
+  const updateUrlParams = useCallback((feedId?: string, categoryId?: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+
+    if (feedId) {
+      params.set('feed', feedId);
+      params.delete('category');
+    } else if (categoryId) {
+      params.set('category', categoryId);
+      params.delete('feed');
+    } else {
+      params.delete('feed');
+      params.delete('category');
+    }
+
+    router.replace(`?${params.toString()}`, { scroll: false });
+  }, [router, searchParams]);
+
+  // Restore state from URL params
+  const restoreStateFromUrl = useCallback(() => {
+    const feedId = searchParams.get('feed');
+    const categoryId = searchParams.get('category');
+
+    if (feedId) {
+      const feed = feeds.find(f => f.id === feedId);
+      if (feed) {
+        setSelectedFeed(feed);
+        setSelectedCategory(null);
+        loadFeedItems(feed);
+      }
+    } else if (categoryId) {
+      const category = categories.find(c => c.id === categoryId);
+      if (category) {
+        setSelectedCategory(category);
+        setSelectedFeed(null);
+        loadCategoryItems(category);
+      }
+    }
+  }, [searchParams, feeds, categories]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Load initial data
   useEffect(() => {
     loadInitialData();
@@ -119,6 +163,13 @@ export default function HomePage() {
       }
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Restore state from URL when data loads
+  useEffect(() => {
+    if (feeds.length > 0 && categories.length >= 0) {
+      restoreStateFromUrl();
+    }
+  }, [feeds, categories, restoreStateFromUrl]);
 
   const loadInitialData = async () => {
     try {
@@ -208,7 +259,7 @@ export default function HomePage() {
     setSseClient(client);
   };
 
-  const loadFeedItems = async (feed: Feed, customFilterUnread?: boolean, skipLoading?: boolean) => {
+  const loadFeedItems = useCallback(async (feed: Feed, customFilterUnread?: boolean, skipLoading?: boolean) => {
     try {
       if (!skipLoading) {
         setItemsLoading(true);
@@ -227,9 +278,9 @@ export default function HomePage() {
         setItemsLoading(false);
       }
     }
-  };
+  }, [filterUnread]);
 
-  const loadCategoryItems = async (category: Category, customFilterUnread?: boolean, skipLoading?: boolean) => {
+  const loadCategoryItems = useCallback(async (category: Category, customFilterUnread?: boolean, skipLoading?: boolean) => {
     try {
       if (!skipLoading) {
         setItemsLoading(true);
@@ -248,17 +299,19 @@ export default function HomePage() {
         setItemsLoading(false);
       }
     }
-  };
+  }, [filterUnread]);
 
   const handleFeedSelect = (feed: Feed) => {
     setSelectedFeed(feed);
     setSelectedCategory(null);
+    updateUrlParams(feed.id);
     loadFeedItems(feed);
   };
 
   const handleCategorySelect = (category: Category) => {
     setSelectedCategory(category);
     setSelectedFeed(null);
+    updateUrlParams(undefined, category.id);
     loadCategoryItems(category);
   };
 
@@ -426,12 +479,12 @@ export default function HomePage() {
 
   const handleOpenSettings = () => {
     setShowSettings(true);
-    setSelectedFeed(null);
-    setSelectedCategory(null);
   };
 
   const handleCloseSettings = () => {
     setShowSettings(false);
+    // Restore state from URL when closing settings
+    restoreStateFromUrl();
   };
 
   const handleOpmlImport = async (file: File) => {
@@ -1040,5 +1093,24 @@ export default function HomePage() {
         category={selectedCategoryForEdit}
       />
     </div>
+  );
+}
+
+function LoadingFallback() {
+  return (
+    <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="text-center space-y-4">
+        <Rss className="h-12 w-12 animate-spin mx-auto text-primary" />
+        <p className="text-muted-foreground">Loading RSS Reader...</p>
+      </div>
+    </div>
+  );
+}
+
+export default function HomePage() {
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <HomePageContent />
+    </Suspense>
   );
 }
