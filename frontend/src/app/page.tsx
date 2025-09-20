@@ -1,6 +1,6 @@
 'use client';
 
-import { AlertTriangle, ChevronDown, ChevronRight, Edit, ExternalLink, Filter, Folder, FolderPlus, MoreVertical, Plus, RefreshCw, Rss, Settings, Upload } from 'lucide-react';
+import { AlertTriangle, ChevronDown, ChevronRight, Edit, ExternalLink, Eye, EyeOff, Filter, Folder, FolderPlus, MoreVertical, Plus, RefreshCw, Rss, Settings, Upload } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -1031,20 +1031,34 @@ function HomePageContent() {
                                       }`}>
                                         {item.title || 'Untitled'}
                                       </h3>
-                                      {item.url && (
-                                        <a
-                                          href={item.url}
-                                          target="_blank"
-                                          rel="noopener noreferrer"
-                                          className={`text-muted-foreground hover:text-primary transition-colors flex-shrink-0 mt-0.5 ${
+                                      <div className="flex items-center gap-1 flex-shrink-0">
+                                        {item.url && (
+                                          <a
+                                            href={item.url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className={`text-muted-foreground hover:text-primary transition-colors p-1 rounded hover:bg-accent/50 ${
+                                              item.is_read ? 'opacity-60' : ''
+                                            }`}
+                                            onClick={(e) => e.stopPropagation()}
+                                            title="Open original article"
+                                          >
+                                            <ExternalLink className="h-5 w-5" />
+                                          </a>
+                                        )}
+                                        <button
+                                          className={`text-muted-foreground hover:text-primary transition-colors p-1 rounded hover:bg-accent/50 ${
                                             item.is_read ? 'opacity-60' : ''
                                           }`}
-                                          onClick={(e) => e.stopPropagation()}
-                                          title="Open original article"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleMarkAsRead(item);
+                                          }}
+                                          title={item.is_read ? 'Mark as unread' : 'Mark as read'}
                                         >
-                                          <ExternalLink className="h-4 w-4" />
-                                        </a>
-                                      )}
+                                          {item.is_read ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                                        </button>
+                                      </div>
                                     </div>
                                     
                                     {item.published_at && (
