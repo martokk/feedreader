@@ -137,10 +137,34 @@ export function ReaderView({ itemId, feeds, onClose, onMarkAsRead }: ReaderViewP
         <div className="max-w-4xl mx-auto p-6">
           {/* Article Header */}
           <div className="mb-8">
-            {/* Title */}
-            <h1 className="text-3xl font-bold leading-tight mb-4">
-              {item.title || 'Untitled Article'}
-            </h1>
+            {/* Title with Action Tray */}
+            <div className="relative group mb-4">
+              <h1 className="text-3xl font-bold leading-tight pr-20">
+                {item.title || 'Untitled Article'}
+              </h1>
+              <FeedItemActionTray placement="top-right" className="opacity-100 pointer-events-auto translate-y-0 md:opacity-100 md:pointer-events-auto md:translate-y-0">
+                {item.url && (
+                  <a
+                    href={item.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-muted-foreground hover:text-primary transition-colors p-1 rounded hover:bg-accent/50"
+                    aria-label="Open original article"
+                    title="Open original article"
+                  >
+                    <ExternalLink className="h-5 w-5" />
+                  </a>
+                )}
+                <button
+                  className="text-muted-foreground hover:text-primary transition-colors p-1 rounded hover:bg-accent/50"
+                  onClick={handleMarkAsRead}
+                  aria-label={item.is_read ? 'Mark as unread' : 'Mark as read'}
+                  title={item.is_read ? 'Mark as unread' : 'Mark as read'}
+                >
+                  {item.is_read ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </button>
+              </FeedItemActionTray>
+            </div>
 
             {/* Metadata */}
             <div className="flex items-center gap-4 text-sm text-muted-foreground mb-6">
@@ -173,32 +197,6 @@ export function ReaderView({ itemId, feeds, onClose, onMarkAsRead }: ReaderViewP
                 />
               </div>
             )}
-
-            {/* Action Tray */}
-            <div className="relative mb-6 group">
-              <FeedItemActionTray placement="top-left">
-                {item.url && (
-                  <a
-                    href={item.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-muted-foreground hover:text-primary transition-colors p-1 rounded hover:bg-accent/50"
-                    aria-label="Open original article"
-                    title="Open original article"
-                  >
-                    <ExternalLink className="h-5 w-5" />
-                  </a>
-                )}
-                <button
-                  className="text-muted-foreground hover:text-primary transition-colors p-1 rounded hover:bg-accent/50"
-                  onClick={handleMarkAsRead}
-                  aria-label={item.is_read ? 'Mark as unread' : 'Mark as read'}
-                  title={item.is_read ? 'Mark as unread' : 'Mark as read'}
-                >
-                  {item.is_read ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                </button>
-              </FeedItemActionTray>
-            </div>
           </div>
 
           {/* Article Content */}
