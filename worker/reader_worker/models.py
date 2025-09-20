@@ -50,6 +50,7 @@ class Item(Base):
     guid: Mapped[str] = mapped_column(String(512), nullable=False)
     title: Mapped[Optional[str]] = mapped_column(String(1024), nullable=True)
     url: Mapped[Optional[str]] = mapped_column(String(2048), nullable=True)
+    image_url: Mapped[Optional[str]] = mapped_column(String(2048), nullable=True)
     content_html: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     content_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     published_at: Mapped[Optional[datetime]] = mapped_column(

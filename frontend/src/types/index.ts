@@ -45,6 +45,7 @@ export interface Item {
   feed_id: string;
   title: string | null;
   url: string | null;
+  image_url: string | null;
   content_text: string | null;
   published_at: string | null;
   fetched_at: string;
@@ -54,6 +55,7 @@ export interface Item {
 }
 
 export interface ItemDetail extends Item {
+  image_url: string | null;
   content_html: string | null;
   content_text: string | null;
 }

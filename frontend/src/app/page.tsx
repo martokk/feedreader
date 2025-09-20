@@ -1,8 +1,8 @@
 'use client';
 
 import { AlertTriangle, ChevronDown, ChevronRight, Edit, ExternalLink, Filter, Folder, FolderPlus, MoreVertical, Plus, RefreshCw, Rss, Settings, Upload } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import { Badge } from '@/components/ui/badge';
@@ -934,14 +934,7 @@ function HomePageContent() {
             />
           ) : (selectedFeed || selectedCategory) ? (
             <div className="h-[calc(100vh-4rem)] overflow-y-auto">
-                  {itemsLoading ? (
-                    <div className="flex items-center justify-center h-64">
-                      <div className="text-center">
-                        <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4" />
-                        <p className="text-muted-foreground">Loading articles...</p>
-                      </div>
-                    </div>
-                  ) : filteredItems.length === 0 ? (
+                  {filteredItems.length === 0 ? (
                     <div className="flex items-center justify-center h-64">
                       <div className="text-center">
                         <Rss className="h-16 w-16 mx-auto mb-4 opacity-50 text-muted-foreground" />
@@ -964,11 +957,31 @@ function HomePageContent() {
                           >
                             <div className="px-6 py-5">
                               <div className="flex items-start gap-4">
-                                {/* Placeholder image */}
-                                <div className={`w-16 h-16 bg-gradient-to-br from-primary/10 to-secondary/10 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                                {/* RSS item image with fallback to placeholder */}
+                                <div className={`w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 ${
                                   item.is_read ? 'opacity-60' : ''
                                 }`}>
-                                  <Rss className="h-6 w-6 text-primary/40" />
+                                  {item.image_url ? (
+                                    <img 
+                                      src={item.image_url}
+                                      alt={item.title || 'Article image'}
+                                      className="w-full h-full object-cover"
+                                      onError={(e) => {
+                                        // Fallback to placeholder on image load error
+                                        const target = e.target as HTMLImageElement;
+                                        target.style.display = 'none';
+                                        const placeholder = target.nextElementSibling as HTMLElement;
+                                        if (placeholder) placeholder.style.display = 'flex';
+                                      }}
+                                    />
+                                  ) : null}
+                                  <div 
+                                    className={`w-full h-full bg-gradient-to-br from-primary/10 to-secondary/10 flex items-center justify-center ${
+                                      item.image_url ? 'hidden' : 'flex'
+                                    }`}
+                                  >
+                                    <Rss className="h-6 w-6 text-primary/40" />
+                                  </div>
                                 </div>
                                 
                                 <div className="flex-1 min-w-0 flex justify-between">

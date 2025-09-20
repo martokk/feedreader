@@ -12,7 +12,9 @@
       "Bash(alembic revision:*)",
       "Bash(docker cp:*)",
       "Bash(rm:*)",
-      "Bash(npm run dev:*)"
+      "Bash(npm run dev:*)",
+      "Bash(docker stop:*)",
+      "Bash(grep:*)"
     ],
     "deny": []
   }
