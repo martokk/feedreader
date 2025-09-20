@@ -133,6 +133,7 @@
 
   /* Article content styling to restore natural spacing */
   .article-content {
+    font-size: 1.15em;
     line-height: 1.7;
   }
 
@@ -220,7 +221,7 @@
     background-color: hsl(var(--muted));
     padding: 0.2em 0.4em;
     border-radius: 0.25rem;
-    font-size: 0.9em;
+    font-size: 0.95em;
   }
 
   .article-content pre code {
