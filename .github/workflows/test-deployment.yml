@@ -104,24 +104,24 @@ jobs:
 
       - name: Test Docker Compose
         run: |
-          # Test that docker-compose.yml is valid and builds
-          docker-compose config
-          docker-compose build --no-cache
+          # Test that docker compose.yml is valid and builds
+          docker compose config
+          docker compose build --no-cache
 
       - name: Run integration test with Docker
         run: |
           # Start services
-          docker-compose up -d
+          docker compose up -d
 
           # Wait for services to be ready
           sleep 30
 
           # Test that all services are healthy
-          docker-compose ps
+          docker compose ps
 
           # Run deployment verification against Docker
           pip install requests
           python api/test_deployment.py http://localhost:8000
 
           # Cleanup
-          docker-compose down
+          docker compose down

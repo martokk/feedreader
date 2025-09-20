@@ -16,9 +16,9 @@ import { Category, Feed, Item, UserSettings } from '@/types';
 import { AddFeedDialog } from '@/components/dialogs/AddFeedDialog';
 import { CategoryDialog } from '@/components/dialogs/CategoryDialog';
 import { FeedSettingsDialog } from '@/components/dialogs/FeedSettingsDialog';
+import FeedItemActionTray from '@/components/feed/FeedItemActionTray';
 import { Settings as SettingsPage } from '@/components/Settings';
 import { ThemeToggle } from '@/components/theme-toggle';
-import FeedItemActionTray from '@/components/feed/FeedItemActionTray';
 
 // Helper function to get feed title by feed_id
 const getFeedTitle = (feedId: string, feeds: Feed[]): string => {
@@ -111,6 +111,16 @@ function HomePageContent() {
 
   // Track initially read items (loaded as read) vs newly read items (marked read during session)
   const [initiallyReadItems, setInitiallyReadItems] = useState<Set<string>>(new Set());
+
+  // Sync filterUnread with userSettings.hide_read_items when settings are loaded
+  useEffect(() => {
+    if (userSettings) {
+      // When hide_read_items is true, we want to hide read items
+      // filterUnread is used for the legacy dropdown logic, but we're not using it anymore
+      // We'll keep it synced for consistency, but the actual filtering uses userSettings.hide_read_items
+      setFilterUnread(userSettings.hide_read_items || false);
+    }
+  }, [userSettings]);
 
   // Refs for scroll detection
   const itemRefs = useRef<Map<string, HTMLElement>>(new Map());
@@ -270,9 +280,14 @@ function HomePageContent() {
         setItemsLoading(true);
       }
       const shouldFilterUnread = customFilterUnread !== undefined ? customFilterUnread : filterUnread;
+      
+      // If hide_read_items is enabled, we need to load ALL items to properly track initially read ones
+      // Otherwise, use the filter to reduce API payload
+      const useApiFilter = !userSettings?.hide_read_items && shouldFilterUnread;
+      
       const itemsData = await api.getFeedItems(feed.id, {
         limit: 100,
-        unread_only: shouldFilterUnread
+        unread_only: useApiFilter
       });
       setItems(itemsData);
 
@@ -292,7 +307,7 @@ function HomePageContent() {
         setItemsLoading(false);
       }
     }
-  }, [filterUnread]);
+  }, [filterUnread, userSettings?.hide_read_items]);
 
   const loadCategoryItems = useCallback(async (category: Category, customFilterUnread?: boolean, skipLoading?: boolean) => {
     try {
@@ -300,9 +315,14 @@ function HomePageContent() {
         setItemsLoading(true);
       }
       const shouldFilterUnread = customFilterUnread !== undefined ? customFilterUnread : filterUnread;
+      
+      // If hide_read_items is enabled, we need to load ALL items to properly track initially read ones
+      // Otherwise, use the filter to reduce API payload
+      const useApiFilter = !userSettings?.hide_read_items && shouldFilterUnread;
+      
       const itemsData = await api.getCategoryItems(category.id, {
         limit: 100,
-        read_status: shouldFilterUnread ? 'unread' : undefined
+        read_status: useApiFilter ? 'unread' : undefined
       });
       setItems(itemsData);
 
@@ -322,7 +342,7 @@ function HomePageContent() {
         setItemsLoading(false);
       }
     }
-  }, [filterUnread]);
+  }, [filterUnread, userSettings?.hide_read_items]);
 
   const handleFeedSelect = (feed: Feed) => {
     setSelectedFeed(feed);
@@ -438,15 +458,14 @@ function HomePageContent() {
   }, [userSettings?.mark_read_on_scroll]);
 
   const filteredItems = items.filter(item => {
-    // New "Hide Read" behavior:
-    // - If hide_read_items setting is enabled, only hide items that were initially read
+    // If hide_read_items setting is enabled (which is synced with filterUnread):
+    // - Only hide items that were initially read (loaded as read)
     // - Items marked as read during this session should remain visible (just dimmed)
     if (userSettings?.hide_read_items && item.is_read && initiallyReadItems.has(item.id)) {
       return false;
     }
-
-    // Legacy filterUnread behavior (for the dropdown menu)
-    if (filterUnread && item.is_read) return false;
+    
+    // If hide_read_items is disabled (Show All mode), show all items
     return true;
   });
 
@@ -525,6 +544,10 @@ function HomePageContent() {
     loadUserSettings();
     // Restore state from URL when closing settings
     restoreStateFromUrl();
+  };
+
+  const handleSettingsChanged = (newSettings: UserSettings) => {
+    setUserSettings(newSettings);
   };
 
   const handleOpmlImport = async (file: File) => {
@@ -776,9 +799,22 @@ function HomePageContent() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => {
+                      <DropdownMenuItem onClick={async () => {
                         const newFilterValue = !filterUnread;
                         setFilterUnread(newFilterValue);
+                        
+                        // Save the setting to backend
+                        try {
+                          const updatedSettings = await api.updateUserSettings({ hide_read_items: newFilterValue });
+                          setUserSettings(updatedSettings);
+                        } catch (error) {
+                          console.error('Failed to save hide read items setting:', error);
+                          toast.error('Failed to save setting');
+                          // Revert on error
+                          setFilterUnread(!newFilterValue);
+                          return;
+                        }
+                        
                         // Reload items with the new filter, skip loading state for smooth transition
                         if (selectedFeed) {
                           loadFeedItems(selectedFeed, newFilterValue, true);
@@ -971,6 +1007,7 @@ function HomePageContent() {
               selectedCategory={selectedSettingsCategory}
               onCategoryChange={setSelectedSettingsCategory}
               onClose={handleCloseSettings}
+              onSettingsChanged={handleSettingsChanged}
             />
           ) : (selectedFeed || selectedCategory) ? (
             <div className="h-[calc(100vh-4rem)] overflow-y-auto">

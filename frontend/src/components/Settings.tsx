@@ -20,6 +20,7 @@ interface SettingsProps {
   selectedCategory: string;
   onCategoryChange: (category: string) => void;
   onClose: () => void;
+  onSettingsChanged?: (settings: UserSettings) => void;
 }
 
 const settingsCategories = [
@@ -27,7 +28,7 @@ const settingsCategories = [
   { id: 'behavior', label: 'Behavior', icon: SettingsIcon },
 ];
 
-export function Settings({ selectedCategory, onCategoryChange, onClose }: SettingsProps) {
+export function Settings({ selectedCategory, onCategoryChange, onClose, onSettingsChanged }: SettingsProps) {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [settings, setSettings] = useState<UserSettings | null>(null);
@@ -70,6 +71,7 @@ export function Settings({ selectedCategory, onCategoryChange, onClose }: Settin
       // Save to database
       const updatedSettings = await api.updateUserSettings({ theme: newTheme });
       setSettings(updatedSettings);
+      onSettingsChanged?.(updatedSettings);
       
       toast.success('Theme preference saved');
     } catch (error) {
@@ -93,6 +95,7 @@ export function Settings({ selectedCategory, onCategoryChange, onClose }: Settin
       // Save to database
       const updatedSettings = await api.updateUserSettings({ mark_read_on_scroll: enabled });
       setSettings(updatedSettings);
+      onSettingsChanged?.(updatedSettings);
 
       toast.success('Mark read on scroll preference saved');
     } catch (error) {
@@ -116,6 +119,7 @@ export function Settings({ selectedCategory, onCategoryChange, onClose }: Settin
       // Save to database
       const updatedSettings = await api.updateUserSettings({ hide_read_items: enabled });
       setSettings(updatedSettings);
+      onSettingsChanged?.(updatedSettings);
 
       toast.success('Hide read items preference saved');
     } catch (error) {
