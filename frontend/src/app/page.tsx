@@ -995,7 +995,7 @@ function HomePageContent() {
                             }`}
                             onClick={() => handleMarkAsRead(item)}
                           >
-                            <div className="px-6 py-5">
+                            <div className="px-6 py-5 relative">
                               <div className="flex items-stretch gap-4 min-h-[6rem]">
                                 {/* RSS item image with fallback to placeholder - 4:3 aspect ratio landscape */}
                                 <div className={`w-[149px] h-[112px] rounded-lg overflow-hidden flex-shrink-0 ${
@@ -1080,10 +1080,9 @@ function HomePageContent() {
                                   </div>
                                 </div>
                               </div>
-                            </div>
-                            
-                            {/* Action Tray - appears on hover */}
-                            <FeedItemActionTray>
+                              
+                              {/* Action Tray - appears on hover */}
+                              <FeedItemActionTray>
                               {item.url && (
                                 <a
                                   href={item.url}
@@ -1112,7 +1111,8 @@ function HomePageContent() {
                               >
                                 {item.is_read ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                               </button>
-                            </FeedItemActionTray>
+                              </FeedItemActionTray>
+                            </div>
                           </article>
                         ))}
                       </div>
