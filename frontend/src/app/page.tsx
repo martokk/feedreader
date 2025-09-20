@@ -18,6 +18,7 @@ import { CategoryDialog } from '@/components/dialogs/CategoryDialog';
 import { FeedSettingsDialog } from '@/components/dialogs/FeedSettingsDialog';
 import { Settings as SettingsPage } from '@/components/Settings';
 import { ThemeToggle } from '@/components/theme-toggle';
+import FeedItemActionTray from '@/components/feed/FeedItemActionTray';
 
 // Helper function to get feed title by feed_id
 const getFeedTitle = (feedId: string, feeds: Feed[]): string => {
@@ -989,7 +990,7 @@ function HomePageContent() {
                             key={item.id}
                             ref={(el) => setItemRef(item.id, el)}
                             data-item-id={item.id}
-                            className={`group cursor-pointer transition-colors hover:bg-accent/30 ${
+                            className={`group relative cursor-pointer transition-colors hover:bg-accent/30 ${
                               item.is_read ? 'opacity-50' : ''
                             }`}
                             onClick={() => handleMarkAsRead(item)}
@@ -1031,34 +1032,6 @@ function HomePageContent() {
                                       }`}>
                                         {item.title || 'Untitled'}
                                       </h3>
-                                      <div className="flex items-center gap-1 flex-shrink-0">
-                                        {item.url && (
-                                          <a
-                                            href={item.url}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className={`text-muted-foreground hover:text-primary transition-colors p-1 rounded hover:bg-accent/50 ${
-                                              item.is_read ? 'opacity-60' : ''
-                                            }`}
-                                            onClick={(e) => e.stopPropagation()}
-                                            title="Open original article"
-                                          >
-                                            <ExternalLink className="h-5 w-5" />
-                                          </a>
-                                        )}
-                                        <button
-                                          className={`text-muted-foreground hover:text-primary transition-colors p-1 rounded hover:bg-accent/50 ${
-                                            item.is_read ? 'opacity-60' : ''
-                                          }`}
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleMarkAsRead(item);
-                                          }}
-                                          title={item.is_read ? 'Mark as unread' : 'Mark as read'}
-                                        >
-                                          {item.is_read ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                                        </button>
-                                      </div>
                                     </div>
                                     
                                     {item.published_at && (
@@ -1108,6 +1081,38 @@ function HomePageContent() {
                                 </div>
                               </div>
                             </div>
+                            
+                            {/* Action Tray - appears on hover */}
+                            <FeedItemActionTray>
+                              {item.url && (
+                                <a
+                                  href={item.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className={`text-muted-foreground hover:text-primary transition-colors p-1 rounded hover:bg-accent/50 ${
+                                    item.is_read ? 'opacity-60' : ''
+                                  }`}
+                                  onClick={(e) => e.stopPropagation()}
+                                  aria-label="Open original article"
+                                  title="Open original article"
+                                >
+                                  <ExternalLink className="h-5 w-5" />
+                                </a>
+                              )}
+                              <button
+                                className={`text-muted-foreground hover:text-primary transition-colors p-1 rounded hover:bg-accent/50 ${
+                                  item.is_read ? 'opacity-60' : ''
+                                }`}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleMarkAsRead(item);
+                                }}
+                                aria-label={item.is_read ? 'Mark as unread' : 'Mark as read'}
+                                title={item.is_read ? 'Mark as unread' : 'Mark as read'}
+                              >
+                                {item.is_read ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                              </button>
+                            </FeedItemActionTray>
                           </article>
                         ))}
                       </div>
