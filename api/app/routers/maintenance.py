@@ -1,10 +1,16 @@
 """Maintenance router for dangerous operations."""
 
+import json
+import uuid
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import delete
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import get_db
+from ..core.redis import get_redis
+from ..models.feed import Feed
 from ..models.item import Item
 from ..models.read_state import ReadState
 
@@ -18,6 +24,8 @@ async def remove_all_feed_items(db: AsyncSession = Depends(get_db)):
     WARNING: This operation is irreversible and will delete all feed items
     and their associated read states. Feeds will appear as if they are being
     scanned for the first time.
+
+    After deletion, all feeds will be queued for immediate refresh to re-fetch content.
     """
     try:
         # First delete all read states (foreign key dependency)
@@ -32,10 +40,47 @@ async def remove_all_feed_items(db: AsyncSession = Depends(get_db)):
 
         await db.commit()
 
+        # After successful deletion, queue all feeds for immediate refresh
+        feeds_queued = 0
+        try:
+            # Get all feeds
+            feeds_stmt = select(Feed)
+            feeds_result = await db.execute(feeds_stmt)
+            feeds = feeds_result.scalars().all()
+
+            if feeds:
+                # Get Redis connection
+                redis = await get_redis()
+
+                # Queue refresh job for each feed
+                for feed in feeds:
+                    # Update next_run_at to now for immediate processing
+                    feed.next_run_at = datetime.utcnow()
+
+                    # Create job data
+                    job_data = {
+                        "job_id": str(uuid.uuid4()),
+                        "feed_id": str(feed.id),
+                        "scheduled_at": datetime.utcnow().isoformat(),
+                        "url": feed.url,
+                    }
+
+                    # Enqueue job
+                    await redis.lpush("rss:jobs", json.dumps(job_data))
+                    feeds_queued += 1
+
+                # Commit the next_run_at updates
+                await db.commit()
+
+        except Exception as queue_error:
+            # Log the error but don't fail the main operation since items were already deleted
+            print(f"Warning: Failed to queue feed refreshes after item deletion: {queue_error}")
+
         return {
-            "message": "Successfully removed all feed items",
+            "message": "Successfully removed all feed items and queued feeds for refresh",
             "items_deleted": items_deleted,
             "read_states_deleted": read_states_deleted,
+            "feeds_queued_for_refresh": feeds_queued,
         }
 
     except Exception as e:

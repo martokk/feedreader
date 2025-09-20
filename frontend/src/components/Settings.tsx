@@ -268,8 +268,8 @@ export function Settings({ selectedCategory, onCategoryChange, onClose, onSettin
                 Remove All Feed Items From Database
               </h5>
               <p className="text-sm text-red-700 dark:text-red-300 mb-3">
-                This action is <strong>irreversible</strong>. It will permanently delete all feed items from the database. 
-                Your feeds will remain, but all articles will be removed and feeds will be scanned as if for the first time.
+                This action is <strong>irreversible</strong>. It will permanently delete all feed items from the database.
+                Your feeds will remain, but all articles will be removed and all feeds will automatically refresh to fetch new content.
               </p>
               <Button
                 variant="destructive"
@@ -307,7 +307,10 @@ export function Settings({ selectedCategory, onCategoryChange, onClose, onSettin
 
     try {
       const result = await api.removeAllFeedItems();
-      toast.success(`Successfully removed ${result.items_deleted} items and ${result.read_states_deleted} read states`);
+      toast.success(
+        `Successfully removed ${result.items_deleted} items and ${result.read_states_deleted} read states. ` +
+        `${result.feeds_queued_for_refresh} feeds queued for immediate refresh.`
+      );
     } catch (error) {
       console.error('Failed to remove all items:', error);
       toast.error('Failed to remove all items. Please try again.');
