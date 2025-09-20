@@ -1,16 +1,16 @@
 'use client';
 
-import { Monitor, Moon, Settings as SettingsIcon, Sun, X } from 'lucide-react';
+import { AlertTriangle, Monitor, Moon, Settings as SettingsIcon, Sun, Wrench, X } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import React, { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
 import { Switch } from '@/components/ui/switch';
 import { api } from '@/lib/api';
@@ -26,6 +26,7 @@ interface SettingsProps {
 const settingsCategories = [
   { id: 'appearance', label: 'Appearance', icon: Monitor },
   { id: 'behavior', label: 'Behavior', icon: SettingsIcon },
+  { id: 'maintenance', label: 'Maintenance', icon: Wrench },
 ];
 
 export function Settings({ selectedCategory, onCategoryChange, onClose, onSettingsChanged }: SettingsProps) {
@@ -232,12 +233,95 @@ export function Settings({ selectedCategory, onCategoryChange, onClose, onSettin
     </div>
   );
 
+  const renderMaintenanceSettings = () => (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-lg font-medium mb-4">Maintenance</h3>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <label className="text-sm font-medium">Auto Cleanup Old Items</label>
+              <p className="text-sm text-muted-foreground">
+                Automatically remove items older than 30 days (placeholder setting)
+              </p>
+            </div>
+            <Switch
+              checked={false}
+              onCheckedChange={() => {}}
+              disabled
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Danger Zone */}
+      <div className="border-t pt-6">
+        <div className="border border-red-200 dark:border-red-800 rounded-lg p-4 bg-red-50 dark:bg-red-950/20">
+          <div className="flex items-center gap-2 mb-3">
+            <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400" />
+            <h4 className="text-lg font-semibold text-red-900 dark:text-red-100">Danger Zone</h4>
+          </div>
+          
+          <div className="space-y-4">
+            <div>
+              <h5 className="text-sm font-medium text-red-900 dark:text-red-100 mb-2">
+                Remove All Feed Items From Database
+              </h5>
+              <p className="text-sm text-red-700 dark:text-red-300 mb-3">
+                This action is <strong>irreversible</strong>. It will permanently delete all feed items from the database. 
+                Your feeds will remain, but all articles will be removed and feeds will be scanned as if for the first time.
+              </p>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={handleRemoveAllItems}
+                className="bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800"
+              >
+                Remove All Items
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const handleRemoveAllItems = async () => {
+    if (!window.confirm(
+      'Are you absolutely sure you want to remove ALL feed items?\n\n' +
+      'This action cannot be undone. All articles will be permanently deleted ' +
+      'and your feeds will start fresh as if being scanned for the first time.\n\n' +
+      'Type "DELETE ALL" in the next prompt to confirm.'
+    )) {
+      return;
+    }
+
+    const confirmation = window.prompt(
+      'Please type "DELETE ALL" (without quotes) to confirm this destructive action:'
+    );
+
+    if (confirmation !== 'DELETE ALL') {
+      toast.error('Confirmation text did not match. Operation cancelled.');
+      return;
+    }
+
+    try {
+      const result = await api.removeAllFeedItems();
+      toast.success(`Successfully removed ${result.items_deleted} items and ${result.read_states_deleted} read states`);
+    } catch (error) {
+      console.error('Failed to remove all items:', error);
+      toast.error('Failed to remove all items. Please try again.');
+    }
+  };
+
   const renderSettingsContent = () => {
     switch (selectedCategory) {
       case 'appearance':
         return renderAppearanceSettings();
       case 'behavior':
         return renderBehaviorSettings();
+      case 'maintenance':
+        return renderMaintenanceSettings();
       default:
         return <div>Select a settings category</div>;
     }
