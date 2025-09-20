@@ -39,6 +39,7 @@ class FeedStats(BaseModel):
     unread_items: int
     last_fetch_at: Optional[datetime]
     last_fetch_status: Optional[int]
+    last_error: Optional[str] = None
     next_run_at: datetime
 
 
@@ -57,6 +58,7 @@ class FeedResponse(BaseModel):
     title: Optional[str]
     last_fetch_at: Optional[datetime]
     last_status: Optional[int]
+    last_error: Optional[str] = None
     next_run_at: datetime
     interval_seconds: int
     created_at: datetime

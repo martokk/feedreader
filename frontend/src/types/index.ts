@@ -4,6 +4,7 @@ export interface Feed {
   title: string | null;
   last_fetch_at: string | null;
   last_status: number | null;
+  last_error?: string | null;
   next_run_at: string;
   interval_seconds: number;
   created_at: string;
@@ -28,6 +29,7 @@ export interface FeedStats {
   unread_items: number;
   last_fetch_at: string | null;
   last_fetch_status: number | null;
+  last_error?: string | null;
   next_run_at: string;
 }
 

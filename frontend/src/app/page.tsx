@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronDown, ChevronRight, Edit, ExternalLink, Filter, Folder, FolderPlus, MoreVertical, Plus, RefreshCw, Rss, Settings, Upload } from 'lucide-react';
+import { AlertTriangle, ChevronDown, ChevronRight, Edit, ExternalLink, Filter, Folder, FolderPlus, MoreVertical, Plus, RefreshCw, Rss, Settings, Upload } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -22,6 +22,17 @@ import { Settings as SettingsPage } from '@/components/Settings';
 const getFeedTitle = (feedId: string, feeds: Feed[]): string => {
   const feed = feeds.find(f => f.id === feedId);
   return feed?.title || 'Unknown Feed';
+};
+
+// Helper function to check if a feed has an error
+const isFeedInError = (feed: Feed): boolean => {
+  return !!(feed.last_error || (feed.last_status && (feed.last_status < 200 || feed.last_status >= 400)));
+};
+
+// Helper function to check if a category contains feeds with errors
+const categoryHasErrors = (categoryId: string, feedsByCategory: Record<string, Feed[]>): boolean => {
+  const categoryFeeds = feedsByCategory[categoryId] || [];
+  return categoryFeeds.some(feed => isFeedInError(feed));
 };
 
 // Helper function to format relative time
@@ -527,7 +538,15 @@ export default function HomePage() {
                       <Folder className="h-4 w-4" />
                     </>
                   )}
-                  <h2 className="text-lg font-semibold">
+                  <h2 
+                    className={`text-lg font-semibold ${selectedFeed ? 'cursor-pointer hover:text-primary transition-colors' : ''}`}
+                    onClick={() => {
+                      if (selectedFeed) {
+                        handleOpenFeedSettings(selectedFeed);
+                      }
+                    }}
+                    title={selectedFeed ? 'Click to edit feed settings' : undefined}
+                  >
                     {selectedFeed ? selectedFeed.title || 'Untitled Feed' : selectedCategory?.name}
                   </h2>
                   {unreadCount > 0 && (
@@ -613,6 +632,9 @@ export default function HomePage() {
                         >
                           {expandedCategories.has(category.id) ? <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />}
                         </Button>
+                        {categoryHasErrors(category.id, feedsByCategory) && (
+                          <AlertTriangle className="h-4 w-4 flex-shrink-0 text-red-500" />
+                        )}
                         {category.color && (
                           <div 
                             className="w-3 h-3 rounded-full border"
@@ -620,7 +642,9 @@ export default function HomePage() {
                           />
                         )}
                         <Folder className="h-4 w-4 flex-shrink-0" />
-                        <span className="flex-1 truncate">{category.name}</span>
+                        <span className={`flex-1 truncate ${categoryHasErrors(category.id, feedsByCategory) ? 'text-red-500' : ''}`}>
+                          {category.name}
+                        </span>
                         {(category.unread_count || 0) > 0 && (
                           <span className="ml-auto text-xs font-semibold text-muted-foreground/80 pr-2">
                             {(category.unread_count || 0)}
@@ -644,8 +668,13 @@ export default function HomePage() {
                             onDragEnd={handleDragEnd}
                           >
                             <div className="flex items-center space-x-2 flex-1 min-w-0">
+                              {isFeedInError(feed) && (
+                                <AlertTriangle className="h-3 w-3 flex-shrink-0 text-red-500" />
+                              )}
                               <Rss className="h-3 w-3 flex-shrink-0" />
-                              <span className="text-sm truncate">{feed.title || 'Untitled Feed'}</span>
+                              <span className={`text-sm truncate ${isFeedInError(feed) ? 'text-red-500' : ''}`}>
+                                {feed.title || 'Untitled Feed'}
+                              </span>
                             </div>
                             {(feed.unread_count || 0) > 0 && (
                               <span className="ml-auto text-xs font-semibold text-muted-foreground/80 pr-2">
@@ -683,8 +712,13 @@ export default function HomePage() {
                         onDragEnd={handleDragEnd}
                       >
                         <div className="flex items-center space-x-2 flex-1 min-w-0">
+                          {isFeedInError(feed) && (
+                            <AlertTriangle className="h-4 w-4 flex-shrink-0 text-red-500" />
+                          )}
                           <Rss className="h-4 w-4 flex-shrink-0" />
-                          <span className="font-medium truncate">{feed.title || 'Untitled Feed'}</span>
+                          <span className={`font-medium truncate ${isFeedInError(feed) ? 'text-red-500' : ''}`}>
+                            {feed.title || 'Untitled Feed'}
+                          </span>
                         </div>
                         {(feed.unread_count || 0) > 0 && (
                           <span className="ml-auto text-xs font-semibold text-muted-foreground/80 pr-2">

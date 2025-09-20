@@ -235,6 +235,11 @@ export function FeedSettingsDialog({
                     Status: {feed.last_status && feed.last_status >= 200 && feed.last_status < 400 ? 'OK' : 'Error'}
                     {feed.last_status && ` (${feed.last_status})`}
                   </p>
+                  {feed.last_error && (
+                    <p className="text-xs text-red-500 mt-1 break-words">
+                      Error: {feed.last_error}
+                    </p>
+                  )}
                 </div>
                 <Button
                   type="button"
